@@ -1,0 +1,16 @@
+image: vm75/openvpn-client:latest
+manifests:
+  - image: vm75/openvpn-client:amd64
+    platform:
+      architecture: amd64
+      os: linux
+  - image: vm75/openvpn-client:aarch64
+    platform:
+      architecture: arm64
+      os: linux
+      variant: v8
+  - image: vm75/openvpn-client:armhf
+    platform:
+      architecture: arm
+      os: linux
+      variant: v6
