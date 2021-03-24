@@ -29,12 +29,25 @@ function cleanup {
     exit 0
 }
 
-mkdir -p /data/var
+function ensureVpnConfig() {
+    config_file=$1
+    if [ -f ${config_file} ] ; then
+        dos2unix ${config_file}
+    fi
+}
+
+mkdir -p /data/var /data/config
 
 env > /data/var/env
 
 config_file=/data/config/vpn.ovpn
-dos2unix ${config_file}
+
+ensureVpnConfig ${config_file}
+
+if [ ! -f ${config_file} ] ; then
+    echo -e "No VPN config file available.\n"
+    exit 1
+fi
 
 echo -e "Starting OpenVPN client.\n"
 
