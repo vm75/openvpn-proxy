@@ -24,7 +24,6 @@ function cleanup {
     fi
 
     sleep 1
-    rm $config_file_modified
     echo "Exiting."
     exit 0
 }
@@ -73,8 +72,8 @@ while [ "$shutting_down" == "no" ] ; do
         --log /data/var/openvpn.log \
         --pull-filter ignore "route-ipv6" \
         --pull-filter ignore "ifconfig-ipv6" \
-        --up ${scriptDir}/up.sh \
-        --down ${scriptDir}/down.sh \
+        --up ${scriptDir}/vpn-up.sh \
+        --down ${scriptDir}/vpn-down.sh \
         --up-restart \
         --group openvpn \
         --redirect-gateway autolocal \
@@ -88,7 +87,7 @@ while [ "$shutting_down" == "no" ] ; do
 
     if [ "$shutting_down" == "no" ] ; then
         echo -e "Retrying openvpn connection ...\n"
-        sleep 60;
+        sleep 15;
     fi
 done
 
