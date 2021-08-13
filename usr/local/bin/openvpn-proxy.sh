@@ -72,6 +72,7 @@ while [ "$shutting_down" == "no" ] ; do
         --log /data/var/openvpn.log \
         --pull-filter ignore "route-ipv6" \
         --pull-filter ignore "ifconfig-ipv6" \
+        --script-security 2 \
         --up ${scriptDir}/vpn-up.sh \
         --down ${scriptDir}/vpn-down.sh \
         --up-restart \
