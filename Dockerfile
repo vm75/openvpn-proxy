@@ -14,7 +14,7 @@ COPY --from=build /usr/local/sbin/sockd /usr/local/sbin/sockd
 
 RUN apk --no-cache update
 RUN apk --no-cache upgrade
-RUN apk --no-cache --no-progress add ip6tables iptables openvpn bind-tools tinyproxy
+RUN apk --no-cache --no-progress add ip6tables iptables openvpn bind-tools tinyproxy inotify-tools
 
 RUN addgroup -S socks && \
     adduser -S -D -G socks -g "socks" -H -h /dev/null socks
