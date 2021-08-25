@@ -4,63 +4,78 @@
 
 SELF=$(realpath "${0}")
 SCRIPT_DIR=$(dirname "${SELF}")
+ETC_DIR=/usr/local/etc
+CONFIG_DIR=/data/config
+VAR_DIR=/data/var
 
-TINY_PROXY_SCRIPT=${SCRIPT_DIR}/tinyproxy_wrapper.sh
-SOCKS_PROXY_SCRIPT=${SCRIPT_DIR}/sockd_wrapper.sh
+# external scripts
 VPN_UP_SCRIPT=${SCRIPT_DIR}/vpn-up.sh
 VPN_DOWN_SCRIPT=${SCRIPT_DIR}/vpn-down.sh
 
-CONFIG_FILE=/data/config/vpn.ovpn
-AUTH_FILE=/data/config/vpn.auth
-LOG_FILE=/data/var/openvpn-proxy.log
+# config files
+VPN_CONF=vpn.ovpn
+VPN_AUTH=vpn.auth
+TINYPROXY_CONF=tinyproxy.conf
+SOCKD_CONF=sockd.conf
+
+# log files
+OPENVPNPROXY_LOG=openvpn-proxy.log
+TINYPROXY_LOG=tinyproxy.log
+SOCKD_LOG=sockd.log
+
+RETRY_INTERVAL=5
+
+function log() {
+    date +"%D %R] ${task}: $*" >> ${VAR_DIR}/${OPENVPNPROXY_LOG}
+}
 
 shutting_down=no
-
 function sigtermHandler {
     shutting_down=yes
     # When you run `docker stop` or any equivalent, a SIGTERM signal is sent to PID 1.
 
-    if [ $monitor_handle ]; then
-        echo -e "${task}: Stopping healthcheck script..." >> ${LOG_FILE}
-        kill -TERM $monitor_handle
+    if [ $monitor_pid ]; then
+        log "Stopping healthcheck script..."
+        kill -TERM $monitor_pid
     fi
 
-    if [ $openvpn_handle ]; then
-        echo -e "${task}: Stopping OpenVPN..." >> ${LOG_FILE}
-        kill -TERM $openvpn_handle
+    if [ $openvpn_pid ]; then
+        log "Stopping OpenVPN..."
+        kill -TERM $openvpn_pid
     fi
 
     sleep 1
-    echo -e "${task}: Exiting." >> ${LOG_FILE}
     exit 0
 }
 
-function ensureVpnConfig() {
-    config_file=/data/var/vpn.ovpn
-    auth_file=/data/var/vpn.auth
-    cp ${CONFIG_FILE} ${config_file}
-    dos2unix ${config_file}
-    cp ${AUTH_FILE} ${auth_file}
+function saveVpnConfig() {
+    log "Copying vpn config to ${VAR_DIR}"
+    cp ${CONFIG_DIR}/${VPN_CONF} ${VAR_DIR}/${VPN_CONF}
+    dos2unix ${VAR_DIR}/${VPN_CONF}
+    cp ${CONFIG_DIR}/${VPN_AUTH} ${VAR_DIR}/${VPN_AUTH}
+    dos2unix ${VAR_DIR}/${VPN_AUTH}
 }
 
-function setRoute() {
+function configureRoutes() {
+    log "Configure routes for vpn-$1"
+
     if [ "$1" == "down" ] ; then
-        echo -e "${task}: Add default gateway to route" >> ${LOG_FILE}
+        log "Add default gateway to route"
         ip route add default via ${default_gateway} dev eth0
     elif [ "$1" == "up" ] ; then
-        echo -e "${task}: Remove default gateway from route" >> ${LOG_FILE}
+        log "Remove default gateway from route"
         ip route del default via ${default_gateway} dev eth0
     fi
 
-    echo -e "${task}: Flush iptables rules" >> ${LOG_FILE}
+    log "Flush iptables rules"
     iptables -F
 
     if [ "$1" == "down" ] ; then
-        echo -e "${task}: Set route to DNS" >> ${LOG_FILE}
+        log "Set route to DNS"
         iptables -A OUTPUT -o eth0 -p udp --dport 53 -j ACCEPT
         iptables -A OUTPUT -o eth0 -j REJECT
     else
-        echo -e "${task}: Setting subnet routes" >> ${LOG_FILE}
+        log "Setting subnet routes"
         for subnet in ${SUBNETS//,/ }; do
             # create a route to it and...
             ip route add ${subnet} via ${default_gateway} dev eth0
@@ -69,151 +84,240 @@ function setRoute() {
         done
     fi
 
-    echo -e "${task}: Set default routes" >> ${LOG_FILE}
+    log "Set default routes"
     iptables -A INPUT -j ACCEPT -m state --state ESTABLISHED
     iptables -A INPUT -i lo -j ACCEPT
     iptables -A OUTPUT -o lo -j ACCEPT
 }
 
 function onVpnUp() {
-    source /data/var/env
+    source ${VAR_DIR}/env
 
-    ${TINY_PROXY_SCRIPT} &
-    ${SOCKS_PROXY_SCRIPT} &
+    until ip address show dev tun0 &> /dev/null ; do
+        log "waiting..."
+        sleep 1
+    done
 
-    setRoute up
+    # Start http proxy
+    runTinyProxy&
 
-    echo -e "${task}: Setting running script" >> ${LOG_FILE}
-    touch /data/var/openvpn-proxy.running
+    # Start socks proxy
+    runSockd&
 
-    #ping -c 10 -A google.com
-    #if [ $? -ne 0 ] ; then
-    #	pkill openvpn
-    #fi
+    # Configure routes
+    configureRoutes up
 }
 
 function onVpnDown() {
-    source /data/var/env
+    source ${VAR_DIR}/env
 
-    echo -e "${task}: Stop socks proxy" >> ${LOG_FILE}
-    pkill socks
-    echo -e "${task}: Stop http proxy" >> ${LOG_FILE}
-    pkill tinyproxy
-    echo -e "${task}: Delete running script" >> ${LOG_FILE}
-    rm -f /data/var/openvpn-proxy.running
+    log "Killing socks proxy"
+    pkill -x sockd
+    log "Killing http proxy"
+    pkill -x tinyproxy
 
     while : ; do
-        echo -e "${task}: Reset routes" >> ${LOG_FILE}
-        setRoute down
+        # Configure routes
+        configureRoutes down
 
-        server=$(grep '^remote ' /data/config/vpn.ovpn  | awk '{print $2}')
+        server=$(grep '^remote ' ${VAR_DIR}/${VPN_CONF} | awk '{print $2}')
         nslookup $server &> /dev/null
         if [ $? -eq 0 ] ; then
             break
         fi
-        echo -e "${task}: Unable to reach server. Trying again..." >> ${LOG_FILE}
+        log "Unable to reach server. Trying again..."
         sleep 1
     done
 }
 
-function setEnv() {
-    echo -e "${task}: Set env file:" >> ${LOG_FILE}
-    env > /data/var/env
+function saveEnv() {
+    log "Saving env variables"
+
+    env > ${VAR_DIR}/env
 
     default_gateway=$(ip r | grep 'default via' | cut -d " " -f 3)
-    echo -e "default_gateway=${default_gateway}" >> /data/var/env
-    echo /data/var/env
+    echo -e "default_gateway=${default_gateway}" >> ${VAR_DIR}/env
+    local contents=$(cat ${VAR_DIR}/env)
+    log "Save env:\n${contents}"
 }
 
+function configChanged() {
+    diff ${CONFIG_DIR}/$1 ${VAR_DIR}/$1 &> /dev/null
+    result=$?
+    if [ $result -ne 0 ] ; then
+        log "$1 has changed!"
+    fi
+    echo $result
+}
+
+# function internetAlive() {
+#     ping -c 1 -A google.com
+#     result=$?
+#     if [ $result -ne 0 ] ; then
+#         log "Internet is down!"
+#     fi
+#     echo $result
+# }
+
 function monitor() {
+    log "Running monitor process..."
+
     task="monitor"
-    while : ; do
-        # echo -e "${task}: Waiting 5 seconds" >> ${LOG_FILE}
-        sleep 5
-        if [ "$shutting_down" == "yes" ] ; then
-            return
+    while [ "$shutting_down" == "no" ] ; do
+        if [ $(configChanged vpn.ovpn) -ne 0 -o $(configChanged vpn.auth) -ne 0 ] ; then
+            saveVpnConfig
+            log "Stopping openvpn"
+        	pkill -x openvpn
         fi
-        # echo -e "${task}: Checking diffs" >> ${LOG_FILE}
-        diff /data/config/vpn.ovpn /data/var/vpn.ovpn &> /dev/null
-        result=$?
-        if [ $result -eq 0 ] ; then
-            diff /data/config/vpn.auth /data/var/vpn.auth &> /dev/null
-            result=$?
-        else
-            echo -e "${task}: vpn config differs" >> ${LOG_FILE}
-        fi
-        if [ $result -eq 0 ] ; then
-            ping -c 1 -A google.com
-            result=$?
-        else
-            echo -e "${task}: vpn auth differs" >> ${LOG_FILE}
-        fi
-        if [ $result -ne 0 ] ; then
-            echo -e "${task}: Killing openvpn" >> ${LOG_FILE}
-        	kill -s INT ${openvpn_handle}
-            exit
-        fi
+        sleep ${RETRY_INTERVAL}
     done
+
+    log "Exiting monitor"
 }
 
 function startVpn() {
-    echo -e "${task}: Starting OpenVPN client" >> ${LOG_FILE}
-    mkdir -p /data/var /data/config &> /dev/null
+    # Clear logs
+    rm -f ${VAR_DIR}/*
 
-    echo -e "${task}: Clear logs" >> ${LOG_FILE}
-    rm -f /data/var/*
+    log "Starting OpenVPN-Proxy"
+    mkdir -p ${VAR_DIR} ${CONFIG_DIR} &> /dev/null
 
-    echo -e "${task}: Configure sigterm handler" >> ${LOG_FILE}
+    log "Configure sigterm handler"
     trap sigtermHandler SIGTERM
 
-    if [ ! -f ${CONFIG_FILE} -o ! -f ${AUTH_FILE} ] ; then
-        echo -e "${task}: Invalid VPN config" >> ${LOG_FILE}
+    if [ ! -f ${CONFIG_DIR}/${VPN_CONF} -o ! -f ${CONFIG_DIR}/${VPN_AUTH} ] ; then
+        log "Invalid VPN config"
         exit 1
     fi
 
-    setEnv
+    # Save/load env variables
+    if [ -f ${VAR_DIR}/env ] ; then
+        source ${VAR_DIR}/env
+    else
+        saveEnv
+    fi
 
-    setRoute init
+    # Configure routes
+    configureRoutes init
+
+    # Save config files to var
+    saveVpnConfig
+
+    # Run monitor process
+    monitor ${openvpn_pid} &
+    monitor_pid=$!
+    log "Monitor started with PID: ${monitor_pid}"
 
     while [ "$shutting_down" == "no" ] ; do
-        ensureVpnConfig
+        log "Call openvpn"
+        openvpn --config ${VAR_DIR}/${VPN_CONF} \
+            --auth-nocache \
+            --connect-retry-max 10 \
+            --auth-user-pass ${VAR_DIR}/${VPN_AUTH} \
+            --status ${VAR_DIR}/openvpn.status 15 \
+            --log ${VAR_DIR}/openvpn.log \
+            --pull-filter ignore "route-ipv6" \
+            --pull-filter ignore "ifconfig-ipv6" \
+            --script-security 2 \
+            --up-delay --up ${VPN_UP_SCRIPT} \
+            --down ${VPN_DOWN_SCRIPT} \
+            --up-restart \
+            --ping-restart ${RETRY_INTERVAL} \
+            --group openvpn \
+            --redirect-gateway autolocal \
+            --cd ${VAR_DIR} &
 
-        echo -e "${task}: Call openvpn" >> ${LOG_FILE}
-        openvpn --config ${config_file} \
-        --auth-nocache \
-        --connect-retry-max 10 \
-        --auth-user-pass ${auth_file} \
-        --status /data/var/openvpn.status 15 \
-        --log /data/var/openvpn.log \
-        --pull-filter ignore "route-ipv6" \
-        --pull-filter ignore "ifconfig-ipv6" \
-        --script-security 2 \
-        --up-delay --up ${VPN_UP_SCRIPT} \
-        --down ${VPN_DOWN_SCRIPT} \
-        --up-restart \
-        --ping-restart 10 \
-        --group openvpn \
-        --redirect-gateway autolocal \
-        --cd /data/config &
+        openvpn_pid=$!
+        log "Openvpn started with PID: ${openvpn_pid}"
 
-        openvpn_handle=$!
-        echo -e "${task}: openvpn_handle=${openvpn_handle}" >> ${LOG_FILE}
+        wait $openvpn_pid
 
-        monitor&
-        monitor_handle=$!
-        echo -e "${task}: monitor_handle=${monitor_handle}" >> ${LOG_FILE}
-
-        wait $openvpn_handle
-
-        echo -e "${task}: VPN down. $shutting_down" >> ${LOG_FILE}
-
-        if [ "$shutting_down" == "no" ] ; then
-            echo -e "${task}: Retrying openvpn connection ..." >> ${LOG_FILE}
-            sleep 5;
+        if [ "$shutting_down" == "yes" ] ; then
+            log "Shutdown encountered"
+            break
         fi
+
+        log "VPN down. Retrying openvpn connection after 5 seconds..."
+        sleep ${RETRY_INTERVAL};
     done
 
-    echo -e "Done!"
+    log "Exiting..."
+}
+
+function runTinyProxy() {
+    log "Starting http proxy..."
+
+    task="tinyproxy-wrapper"
+    if [ "${HTTP_PROXY}" != "on" ] ; then
+        log "HTTP_PROXY is ${HTTP_PROXY}"
+        return
+    fi
+
+    until ip a | grep tun0 > /dev/null 2>&1 ; do
+        sleep 1
+    done
+
+    if [ ! -f "${VAR_DIR}/${TINYPROXY_CONF}" ] ; then
+        cp ${ETC_DIR}/${TINYPROXY_CONF} ${VAR_DIR}/${TINYPROXY_CONF}
+
+        if [ ${PROXY_USERNAME} ] ; then
+            if [ ${PROXY_PASSWORD} ] ; then
+                log "Configuring proxy authentication"
+                echo -e "\nBasicAuth ${PROXY_USERNAME} ${PROXY_PASSWORD}" >> ${VAR_DIR}/${TINYPROXY_CONF}
+            else
+                log "WARNING: Proxy username supplied without password. Starting HTTP proxy without credentials"
+            fi
+        fi
+    fi
+
+    # update IP
+    local addr_eth=$(ip a show dev eth0 | grep "inet " | cut -d " " -f 6 | cut -d "/" -f 1)
+    local addr_tun=$(ip a show dev tun0 | grep "inet " | cut -d " " -f 6 | cut -d "/" -f 1)
+    sed -i \
+        -e "/Listen.*/c Listen $addr_eth" \
+        -e "/Bind.*/c Bind $addr_tun" \
+        ${VAR_DIR}/${TINYPROXY_CONF}
+
+    tinyproxy -d -c ${VAR_DIR}/${TINYPROXY_CONF} >> ${VAR_DIR}/${TINYPROXY_LOG} 2>&1 &
+    tinyproxy_pid=$!
+    log "Started Tinyproxy HTTP proxy server with PID: ${tinyproxy_pid}"
+
+    wait $tinyproxy_pid
+
+    log "Tinyproxy HTTP proxy server exited!"
+}
+
+function runSockd() {
+    log "Starting socks proxy..."
+
+    task="sockd-wrapper"
+    if [ "$SOCKS_PROXY" != "on" ] ; then
+        log "SOCKS_PROXY is $SOCKS_PROXY"
+        return
+    fi
+
+    if [ ! -f "${VAR_DIR}/${SOCKD_CONF}" ] ; then
+        cp ${ETC_DIR}/${SOCKD_CONF} ${VAR_DIR}/${SOCKD_CONF}
+
+        if [ $PROXY_USERNAME ] ; then
+            if [ $PROXY_PASSWORD ] ; then
+                log "Configuring proxy authentication"
+                adduser -S -D -g $PROXY_USERNAME -H -h /dev/null $PROXY_USERNAME
+                echo "$PROXY_USERNAME:$PROXY_PASSWORD" | chpasswd 2> /dev/null
+                sed -i 's/socksmethod: none/socksmethod: username/' ${VAR_DIR}/${SOCKD_CONF}
+            else
+                log "WARNING: Proxy username supplied without password. Starting SOCKS proxy without credentials"
+            fi
+        fi
+    fi
+
+    sockd -f ${VAR_DIR}/${SOCKD_CONF} >> ${VAR_DIR}/${SOCKD_LOG} 2>&1 &
+    sockd_pid=$!
+    log "Started Dante SOCKS proxy server with PID: ${sockd_pid}"
+
+    wait ${sockd_pid}
+
+    log "Dante SOCKS proxy server exited!"
 }
 
 function main() {
