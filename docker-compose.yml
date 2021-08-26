@@ -1,0 +1,57 @@
+version: '3.4'
+
+services:
+  vpn:
+    container_name: vpn
+    image: vm75/openvpn-proxy
+    cap_add:
+      - ALL
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - KILL_SWITCH=on
+      - SOCKS_PROXY=on
+      - HTTP_PROXY=on
+      - SUBNETS=192.168.1.0/24
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
+    devices:
+      - /dev/net/tun
+    ports:
+      - 4444:8080 # http-proxy
+      - 5555:1080 # socks-proxy
+      - 8112:8112 # deluge
+      - 9117:9117 # jackett
+    volumes:
+      - ./openvpn-proxy:/data
+    restart: unless-stopped
+
+  deluge:
+    image: ghcr.io/linuxserver/deluge
+    container_name: deluge
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - DELUGE_LOGLEVEL=warning #optional
+    network_mode: service:vpn
+    depends_on:
+      - vpn
+    volumes:
+      - ./downloads:/downloads
+      - ./deluge:/config
+    restart: unless-stopped
+
+  jackett:
+    container_name: jackett
+    image: ghcr.io/linuxserver/jackett
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ./downloads/watch:/downloads # place where to put .torrent files for manual download
+      - ./jackett:/config # config files
+    network_mode: service:vpn
+    depends_on:
+      - vpn
+    restart: unless-stopped

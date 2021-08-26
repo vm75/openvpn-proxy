@@ -1,15 +1,15 @@
-image: vm75/openvpn-client:latest
+image: vm75/openvpn-proxy:latest
 manifests:
-  - image: vm75/openvpn-client:amd64
+  - image: vm75/openvpn-proxy:amd64
     platform:
       architecture: amd64
       os: linux
-  - image: vm75/openvpn-client:aarch64
+  - image: vm75/openvpn-proxy:aarch64
     platform:
       architecture: arm64
       os: linux
       variant: v8
-  - image: vm75/openvpn-client:armhf
+  - image: vm75/openvpn-proxy:armhf
     platform:
       architecture: arm
       os: linux
