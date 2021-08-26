@@ -26,7 +26,7 @@ SOCKD_LOG=sockd.log
 RETRY_INTERVAL=5
 
 function log() {
-    date +"%D %R] ${task}: $*" >> ${VAR_DIR}/${OPENVPNPROXY_LOG}
+    date +"%D %R] ${task}: $@" >> ${VAR_DIR}/${OPENVPNPROXY_LOG}
 }
 
 shutting_down=no
@@ -138,7 +138,7 @@ function saveEnv() {
     default_gateway=$(ip r | grep 'default via' | cut -d " " -f 3)
     echo -e "default_gateway=${default_gateway}" >> ${VAR_DIR}/env
     local contents=$(cat ${VAR_DIR}/env)
-    log "Save env:\n${contents}"
+    log "Save env:%n${contents}"
 }
 
 function configChanged() {
@@ -253,7 +253,7 @@ function runTinyProxy() {
         return
     fi
 
-    until ip a | grep tun0 > /dev/null 2>&1 ; do
+    until ip a show dev tun0 > /dev/null 2>&1 ; do
         sleep 1
     done
 
