@@ -1,7 +1,5 @@
 #!/bin/sh
 
-# exec 1>> /data/var/openvpn-proxy.log 2>&1
-
 SELF=$(realpath "${0}")
 SCRIPT_DIR=$(dirname "${SELF}")
 ETC_DIR=/usr/local/etc
@@ -23,7 +21,7 @@ OPENVPNPROXY_LOG=openvpn-proxy.log
 TINYPROXY_LOG=tinyproxy.log
 SOCKD_LOG=sockd.log
 
-RETRY_INTERVAL=5
+RETRY_INTERVAL=${RETRY_INTERVAL:-5}
 
 function log() {
     date +"%D %R] ${task}: $@" >> ${VAR_DIR}/${OPENVPNPROXY_LOG}
@@ -88,160 +86,6 @@ function configureRoutes() {
     iptables -A INPUT -j ACCEPT -m state --state ESTABLISHED
     iptables -A INPUT -i lo -j ACCEPT
     iptables -A OUTPUT -o lo -j ACCEPT
-}
-
-function onVpnUp() {
-    source ${VAR_DIR}/env
-
-    until ip address show dev tun0 &> /dev/null ; do
-        log "waiting..."
-        sleep 1
-    done
-
-    # Start http proxy
-    runTinyProxy&
-
-    # Start socks proxy
-    runSockd&
-
-    # Configure routes
-    configureRoutes up
-}
-
-function onVpnDown() {
-    source ${VAR_DIR}/env
-
-    log "Killing socks proxy"
-    pkill -x sockd
-    log "Killing http proxy"
-    pkill -x tinyproxy
-
-    while : ; do
-        # Configure routes
-        configureRoutes down
-
-        server=$(grep '^remote ' ${VAR_DIR}/${VPN_CONF} | awk '{print $2}')
-        nslookup $server &> /dev/null
-        if [ $? -eq 0 ] ; then
-            break
-        fi
-        log "Unable to reach server. Trying again..."
-        sleep 1
-    done
-}
-
-function saveEnv() {
-    log "Saving env variables"
-
-    env > ${VAR_DIR}/env
-
-    default_gateway=$(ip r | grep 'default via' | cut -d " " -f 3)
-    echo -e "default_gateway=${default_gateway}" >> ${VAR_DIR}/env
-    local contents=$(cat ${VAR_DIR}/env)
-    log "Save env:%n${contents}"
-}
-
-function configChanged() {
-    diff ${CONFIG_DIR}/$1 ${VAR_DIR}/$1 &> /dev/null
-    result=$?
-    if [ $result -ne 0 ] ; then
-        log "$1 has changed!"
-    fi
-    echo $result
-}
-
-# function internetAlive() {
-#     ping -c 1 -A google.com
-#     result=$?
-#     if [ $result -ne 0 ] ; then
-#         log "Internet is down!"
-#     fi
-#     echo $result
-# }
-
-function monitor() {
-    log "Running monitor process..."
-
-    task="monitor"
-    while [ "$shutting_down" == "no" ] ; do
-        if [ $(configChanged vpn.ovpn) -ne 0 -o $(configChanged vpn.auth) -ne 0 ] ; then
-            saveVpnConfig
-            log "Stopping openvpn"
-        	pkill -x openvpn
-        fi
-        sleep ${RETRY_INTERVAL}
-    done
-
-    log "Exiting monitor"
-}
-
-function startVpn() {
-    # Clear logs
-    rm -f ${VAR_DIR}/*
-
-    log "Starting OpenVPN-Proxy"
-    mkdir -p ${VAR_DIR} ${CONFIG_DIR} &> /dev/null
-
-    log "Configure sigterm handler"
-    trap sigtermHandler SIGTERM
-
-    if [ ! -f ${CONFIG_DIR}/${VPN_CONF} -o ! -f ${CONFIG_DIR}/${VPN_AUTH} ] ; then
-        log "Invalid VPN config"
-        exit 1
-    fi
-
-    # Save/load env variables
-    if [ -f ${VAR_DIR}/env ] ; then
-        source ${VAR_DIR}/env
-    else
-        saveEnv
-    fi
-
-    # Configure routes
-    configureRoutes init
-
-    # Save config files to var
-    saveVpnConfig
-
-    # Run monitor process
-    monitor ${openvpn_pid} &
-    monitor_pid=$!
-    log "Monitor started with PID: ${monitor_pid}"
-
-    while [ "$shutting_down" == "no" ] ; do
-        log "Call openvpn"
-        openvpn --config ${VAR_DIR}/${VPN_CONF} \
-            --auth-nocache \
-            --connect-retry-max 10 \
-            --auth-user-pass ${VAR_DIR}/${VPN_AUTH} \
-            --status ${VAR_DIR}/openvpn.status 15 \
-            --log ${VAR_DIR}/openvpn.log \
-            --pull-filter ignore "route-ipv6" \
-            --pull-filter ignore "ifconfig-ipv6" \
-            --script-security 2 \
-            --up-delay --up ${VPN_UP_SCRIPT} \
-            --down ${VPN_DOWN_SCRIPT} \
-            --up-restart \
-            --ping-restart ${RETRY_INTERVAL} \
-            --group openvpn \
-            --redirect-gateway autolocal \
-            --cd ${VAR_DIR} &
-
-        openvpn_pid=$!
-        log "Openvpn started with PID: ${openvpn_pid}"
-
-        wait $openvpn_pid
-
-        if [ "$shutting_down" == "yes" ] ; then
-            log "Shutdown encountered"
-            break
-        fi
-
-        log "VPN down. Retrying openvpn connection after 5 seconds..."
-        sleep ${RETRY_INTERVAL};
-    done
-
-    log "Exiting..."
 }
 
 function runTinyProxy() {
@@ -320,7 +164,159 @@ function runSockd() {
     log "Dante SOCKS proxy server exited!"
 }
 
+function onVpnUp() {
+    source ${VAR_DIR}/env
+
+    log "Setting proxy and routes"
+
+    until ip address show dev tun0 &> /dev/null ; do
+        log "waiting..."
+        sleep 1
+    done
+
+    # Start http proxy
+    runTinyProxy&
+
+    # Start socks proxy
+    runSockd&
+
+    # Configure routes
+    configureRoutes up
+
+    # Set read permission
+    chmod +x /data/var/*
+}
+
+function onVpnDown() {
+    source ${VAR_DIR}/env
+
+    log "Stopping proxy and resetting routes"
+
+    # Killing socks proxy
+    pkill -x sockd
+    # Killing http proxy
+    pkill -x tinyproxy
+
+    while : ; do
+        # Configure routes
+        configureRoutes down
+
+        server=$(grep '^remote ' ${VAR_DIR}/${VPN_CONF} | awk '{print $2}')
+        nslookup $server &> /dev/null
+        if [ $? -eq 0 ] ; then
+            break
+        fi
+        log "Unable to reach server. Trying again..."
+        sleep 1
+    done
+}
+
+function saveEnv() {
+    log "Saving env variables"
+
+    env > ${VAR_DIR}/env
+
+    default_gateway=$(ip r | grep 'default via' | cut -d " " -f 3)
+    echo -e "default_gateway=${default_gateway}" >> ${VAR_DIR}/env
+    local contents=$(cat ${VAR_DIR}/env)
+    log "Save env:%n${contents}"
+}
+
+function configChanged() {
+    diff ${CONFIG_DIR}/$1 ${VAR_DIR}/$1 &> /dev/null
+    result=$?
+    if [ $result -ne 0 ] ; then
+        log "$1 has changed!"
+    fi
+    echo $result
+}
+
+function monitor() {
+    log "Running monitor process..."
+
+    task="monitor"
+    while [ "$shutting_down" == "no" ] ; do
+        if [ $(configChanged vpn.ovpn) -ne 0 -o $(configChanged vpn.auth) -ne 0 ] ; then
+            saveVpnConfig
+            log "Stopping openvpn"
+        	pkill -x openvpn
+        fi
+        sleep ${RETRY_INTERVAL}
+    done
+
+    log "Exiting monitor"
+}
+
+function startVpn() {
+    log "Starting OpenVPN-Proxy"
+    mkdir -p ${VAR_DIR} ${CONFIG_DIR} &> /dev/null
+
+    log "Configure sigterm handler"
+    trap sigtermHandler SIGTERM
+
+    if [ ! -f ${CONFIG_DIR}/${VPN_CONF} -o ! -f ${CONFIG_DIR}/${VPN_AUTH} ] ; then
+        log "Invalid VPN config"
+        exit 1
+    fi
+
+    # Save/load env variables
+    if [ -f ${VAR_DIR}/env ] ; then
+        source ${VAR_DIR}/env
+    else
+        saveEnv
+    fi
+
+    # Configure routes
+    configureRoutes init
+
+    # Save config files to var
+    saveVpnConfig
+
+    # Run monitor process
+    monitor ${openvpn_pid} &
+    monitor_pid=$!
+    log "Monitor started with PID: ${monitor_pid}"
+
+    while [ "$shutting_down" == "no" ] ; do
+        log "Call openvpn"
+        openvpn --config ${VAR_DIR}/${VPN_CONF} \
+            --auth-nocache \
+            --connect-retry-max 10 \
+            --auth-user-pass ${VAR_DIR}/${VPN_AUTH} \
+            --status ${VAR_DIR}/openvpn.status 15 \
+            --log ${VAR_DIR}/openvpn.log \
+            --pull-filter ignore "route-ipv6" \
+            --pull-filter ignore "ifconfig-ipv6" \
+            --script-security 2 \
+            --up-delay --up ${VPN_UP_SCRIPT} \
+            --down ${VPN_DOWN_SCRIPT} \
+            --up-restart \
+            --ping-restart ${RETRY_INTERVAL} \
+            --user proxy \
+            --group proxy \
+            --redirect-gateway autolocal \
+            --cd ${VAR_DIR} & #>> /data/var/run.log 2>&1 &
+
+        openvpn_pid=$!
+        log "Openvpn started with PID: ${openvpn_pid}"
+
+        wait $openvpn_pid
+
+        if [ "$shutting_down" == "yes" ] ; then
+            log "Shutdown encountered"
+            break
+        fi
+
+        log "VPN down. Retrying openvpn connection after 5 seconds..."
+        sleep ${RETRY_INTERVAL};
+    done
+
+    log "Exiting..."
+}
+
 function main() {
+    export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
     case "$1" in
     --vpn-up)
         shift
