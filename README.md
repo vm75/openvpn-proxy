@@ -100,3 +100,32 @@ Once you have container running `ghcr.io/wfg/openvpn-client`, run the following 
 docker run --rm -it --network=container:openvpn-client alpine wget -qO - ifconfig.me
 ```
 
+# References
+- [Docker](https://www.docker.com/blog/faster-multi-platform-builds-dockerfile-cross-compilation-guide/)
+- [preactjs](https://preactjs.com/)
+- [mongoose](https://mongoose.ws/documentation/)
+- [bulma](https://bulma.io/)
+- [cash](https://github.com/fabiospampinato/cash)
+
+templates: name, ovpn
+
+remotes:
+
+target: template, remote
+
+{
+    "templates": {
+        "name": "",
+        "config": "",
+        remotes: [ {
+            name: "",
+            target: "",
+            proto:
+        } ]
+    }
+}
+
+api/template
+    get
+    set
+
