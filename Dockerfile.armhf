@@ -1,7 +1,7 @@
 FROM arm32v6/alpine as build
 COPY qemu-aarch64-static /usr/bin/
 
-ARG DANTE_VERSION=1.4.2
+ARG DANTE_VERSION=1.4.3
 
 RUN apk add --no-cache build-base
 RUN wget https://www.inet.no/dante/files/dante-$DANTE_VERSION.tar.gz --output-document - | tar -xz && \
@@ -16,7 +16,7 @@ COPY --from=build /usr/local/sbin/sockd /usr/local/sbin/sockd
 
 RUN apk --no-cache update
 RUN apk --no-cache upgrade
-RUN apk --no-cache --no-progress add ip6tables iptables openvpn bind-tools tinyproxy
+RUN apk --no-cache --no-progress add ip6tables iptables openvpn bind-tools tinyproxy inotify-tools
 
 RUN addgroup -S socks && \
     adduser -S -D -G socks -g "socks" -H -h /dev/null socks

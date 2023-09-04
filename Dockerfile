@@ -1,6 +1,6 @@
 FROM alpine AS build
 
-ARG DANTE_VERSION=1.4.2
+ARG DANTE_VERSION=1.4.3
 
 RUN apk add --no-cache build-base
 RUN wget https://www.inet.no/dante/files/dante-$DANTE_VERSION.tar.gz --output-document - | tar -xz && \

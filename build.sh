@@ -15,6 +15,6 @@ sudo docker tag ${IMAGE_ID} vm75/openvpn-proxy:latest vm75/openvpn-proxy:${VERSI
 if [ "$2" == push ] ; then
 	sudo docker login
 	if [[ $? -eq 0 ]] ; then
-			sudo docker push vm75/openvpn-proxy
+		sudo docker push vm75/openvpn-proxy
 	fi
 fi

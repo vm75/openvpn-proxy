@@ -26,16 +26,16 @@ function logRotate() {
 
     local size=$(du -k ${OPENVPNPROXY_LOG} | cut -f 1)
     if [ ${size} -gt 1024 ] ; then
-        log "Rotating log file"
         local i=5
         while [ ${i} -gt 0 ] ; do
             local j=$((i-1))
-            if [ -f ${OPENVPNPROXY_LOG}.${j} ] ; then
-                mv ${OPENVPNPROXY_LOG}.${j} ${OPENVPNPROXY_LOG}.${i}
+            if [ -f ${OPENVPNPROXY_LOG}.${i} ] ; then
+                mv -f ${OPENVPNPROXY_LOG}.${j} ${OPENVPNPROXY_LOG}.${i}
             fi
             i=${j}
         done
-        mv ${OPENVPNPROXY_LOG} ${OPENVPNPROXY_LOG}.0
+        mv -f ${OPENVPNPROXY_LOG} ${OPENVPNPROXY_LOG}.0
+        touch ${OPENVPNPROXY_LOG}
     fi
 }
 

@@ -10,7 +10,7 @@ VPN_DOWN_SCRIPT=${SCRIPT_DIR}/vpn-down
 VPN_CONF_SRC=${CONFIG_DIR}/vpn.ovpn
 VPN_AUTH_SRC=${CONFIG_DIR}/vpn.auth
 
-RETRY_INTERVAL=5
+RETRY_INTERVAL=30
 
 function stopBackgroundProcesses() {
     log "Stopping background processes..."
@@ -65,7 +65,7 @@ function saveEnv() {
 }
 
 function configChanged() {
-    diff ${CONFIG_DIR}/$1 ${VAR_DIR}/$1 &> /dev/null
+    diff -w ${CONFIG_DIR}/$1 ${VAR_DIR}/$1 &> /dev/null
 }
 
 # function internetAlive() {
@@ -82,6 +82,7 @@ function monitor() {
 
     task="monitor"
     while [ "$shutting_down" == "no" ] ; do
+        chmod a+r ${VAR_DIR}/*
         changed=0
         if ! configChanged vpn.ovpn ; then
             log "VPN config changed. Restarting openvpn"
@@ -145,15 +146,19 @@ function main() {
             --auth-user-pass ${VPN_AUTH} \
             --status ${VAR_DIR}/openvpn.status 15 \
             --log ${VAR_DIR}/openvpn.log \
-            --pull-filter ignore "route-ipv6" \
-            --pull-filter ignore "ifconfig-ipv6" \
+            --pull-filter ignore route-ipv6 \
+            --pull-filter ignore ifconfig-ipv6 \
+            --pull-filter ignore block-outside-dns \
             --script-security 2 \
             --up-delay --up ${VPN_UP_SCRIPT} \
             --down ${VPN_DOWN_SCRIPT} \
             --up-restart \
             --ping-restart ${RETRY_INTERVAL} \
             --group openvpn \
-            --redirect-gateway autolocal \
+            --redirect-gateway def1 \
+            --remote-cert-tls server \
+            --data-ciphers AES-256-GCM:AES-128-GCM:AES-256-CBC:AES-128-CBC \
+            --verb 1 \
             --cd ${VAR_DIR} >> ${OPENVPNPROXY_LOG} 2>&1 &
 
         openvpn_pid=$!
