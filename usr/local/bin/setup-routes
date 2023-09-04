@@ -1,0 +1,46 @@
+#!/bin/sh
+
+. $(dirname $0)/common.inc
+
+function main() {
+    loadSavedVars
+
+    log "Configure routes for vpn-$1"
+
+    if [ "$1" == "down" ] ; then
+        log "Add default gateway to route"
+        ip route add default via ${default_gateway} dev eth0
+    elif [ "$1" == "up" ] ; then
+        log "Remove default gateway from route"
+        ip route del default via ${default_gateway} dev eth0
+    fi
+
+    log "Flush iptables rules"
+    iptables -F
+
+    if [ "$1" == "down" ] ; then
+        log "Set route to DNS"
+        iptables -A OUTPUT -o eth0 -p udp --dport 53 -j ACCEPT
+        local protocol=$(grep '^proto ' ${VPN_CONF} | awk '{print $2}')
+        local port=$(grep '^remote ' ${VPN_CONF} | awk '{print $3}')
+        iptables -A OUTPUT -o eth0 -p ${protocol} --dport ${port} -j ACCEPT
+        iptables -A OUTPUT -o eth0 -j REJECT
+    else
+        log "Setting subnet routes"
+        for subnet in ${SUBNETS//,/ }; do
+            # create a route to it and...
+            ip route add ${subnet} via ${default_gateway} dev eth0
+            # allow connections
+            iptables -A INPUT -s ${subnet} -j ACCEPT
+        done
+    fi
+
+    log "Set default routes"
+    iptables -A INPUT -j ACCEPT -m state --state ESTABLISHED
+    iptables -A INPUT -i lo -j ACCEPT
+    iptables -A OUTPUT -o lo -j ACCEPT
+}
+
+main "$@"
+
+exit 0

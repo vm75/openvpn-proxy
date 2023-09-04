@@ -1,0 +1,114 @@
+#!/bin/sh
+
+. $(dirname $0)/common.inc
+
+# config files
+TINYPROXY_CONF_TEMPLATE=${ETC_DIR}/tinyproxy.conf
+TINYPROXY_CONF=${VAR_DIR}/tinyproxy.conf
+SOCKD_CONF_TEMPLATE=${ETC_DIR}/sockd.conf
+SOCKD_CONF=${VAR_DIR}/sockd.conf
+
+# log files
+TINYPROXY_LOG=${VAR_DIR}/tinyproxy.log
+SOCKD_LOG=${VAR_DIR}/sockd.log
+
+function runTinyProxy() {
+    log "Starting http proxy..."
+
+    task="tinyproxy-wrapper"
+    if [ "${HTTP_PROXY}" != "on" ] ; then
+        log "HTTP_PROXY is ${HTTP_PROXY}"
+        return
+    fi
+
+    until ip a show dev tun0 > /dev/null 2>&1 ; do
+        sleep 1
+    done
+
+    if [ ! -f ${TINYPROXY_CONF} ] ; then
+        cp ${TINYPROXY_CONF_TEMPLATE} ${TINYPROXY_CONF}
+
+        if [ ${PROXY_USERNAME} ] ; then
+            if [ ${PROXY_PASSWORD} ] ; then
+                log "Configuring proxy authentication"
+                echo -e "\nBasicAuth ${PROXY_USERNAME} ${PROXY_PASSWORD}" >> ${TINYPROXY_CONF}
+            else
+                log "WARNING: Proxy username supplied without password. Starting HTTP proxy without credentials"
+            fi
+        fi
+    fi
+
+    # update IP
+    local addr_eth=$(ip a show dev eth0 | grep "inet " | cut -d " " -f 6 | cut -d "/" -f 1)
+    local addr_tun=$(ip a show dev tun0 | grep "inet " | cut -d " " -f 6 | cut -d "/" -f 1)
+    sed -i \
+        -e "/Listen.*/c Listen $addr_eth" \
+        -e "/Bind.*/c Bind $addr_tun" \
+        ${TINYPROXY_CONF}
+
+    tinyproxy -d -c ${TINYPROXY_CONF} >> ${TINYPROXY_LOG} 2>&1 &
+    tinyproxy_pid=$!
+    log "Started Tinyproxy HTTP proxy server with PID: ${tinyproxy_pid}"
+
+    wait $tinyproxy_pid
+
+    log "Tinyproxy HTTP proxy server exited!"
+}
+
+function runSockd() {
+    log "Starting socks proxy..."
+
+    task="sockd-wrapper"
+    if [ "$SOCKS_PROXY" != "on" ] ; then
+        log "SOCKS_PROXY is $SOCKS_PROXY"
+        return
+    fi
+
+    if [ ! -f "${SOCKD_CONF}" ] ; then
+        cp ${SOCKD_CONF_TEMPLATE} ${SOCKD_CONF}
+
+        if [ $PROXY_USERNAME ] ; then
+            if [ $PROXY_PASSWORD ] ; then
+                log "Configuring proxy authentication"
+                adduser -S -D -g $PROXY_USERNAME -H -h /dev/null $PROXY_USERNAME
+                echo "$PROXY_USERNAME:$PROXY_PASSWORD" | chpasswd 2> /dev/null
+                sed -i 's/socksmethod: none/socksmethod: username/' ${SOCKD_CONF}
+            else
+                log "WARNING: Proxy username supplied without password. Starting SOCKS proxy without credentials"
+            fi
+        fi
+    fi
+
+    sockd -f ${SOCKD_CONF} >> ${SOCKD_LOG} 2>&1 &
+    sockd_pid=$!
+    log "Started Dante SOCKS proxy server with PID: ${sockd_pid}"
+
+    wait ${sockd_pid}
+
+    log "Dante SOCKS proxy server exited!"
+}
+
+function main() {
+    loadSavedVars
+
+    until ip address show dev tun0 &> /dev/null ; do
+        log "waiting..."
+        sleep 1
+    done
+
+    # Start http proxy
+    runTinyProxy&
+
+    # Start socks proxy
+    runSockd&
+
+    # Configure routes
+    ${SCRIPT_DIR}/setup-routes up
+
+    # Configure DNS
+    ${SCRIPT_DIR}/client.up >> ${OPENVPNPROXY_LOG} &
+}
+
+main "$@"
+
+exit 0

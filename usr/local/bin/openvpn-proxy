@@ -1,0 +1,183 @@
+#!/bin/sh
+
+. $(dirname $0)/common.inc
+
+# external scripts
+VPN_UP_SCRIPT=${SCRIPT_DIR}/vpn-up
+VPN_DOWN_SCRIPT=${SCRIPT_DIR}/vpn-down
+
+# config files
+VPN_CONF_SRC=${CONFIG_DIR}/vpn.ovpn
+VPN_AUTH_SRC=${CONFIG_DIR}/vpn.auth
+
+RETRY_INTERVAL=5
+
+function stopBackgroundProcesses() {
+    log "Stopping background processes..."
+    if [ $monitor_pid ]; then
+        log "Stopping healthcheck script..."
+        kill -TERM $monitor_pid
+        unset monitor_pid
+    fi
+
+    if [ $openvpn_pid ]; then
+        log "Stopping OpenVPN..."
+        kill -TERM $openvpn_pid
+        unset openvpn_pid
+    fi
+
+    if [ $tail_pid ]; then
+        log "Stopping tail process..."
+        kill -TERM $tail_pid
+        unset tail_pid
+    fi
+}
+
+shutting_down=no
+function sigtermHandler {
+    shutting_down=yes
+    # When you run `docker stop` or any equivalent, a SIGTERM signal is sent to PID 1.
+
+    # stop all background processes
+    stopBackgroundProcesses
+
+    sleep 1
+    exit 0
+}
+
+function saveVpnConfig() {
+    log "Copying vpn config to ${VAR_DIR}"
+    cp ${VPN_CONF_SRC} ${VPN_CONF}
+    dos2unix ${VPN_CONF}
+    cp ${VPN_AUTH_SRC} ${VPN_AUTH}
+    dos2unix ${VPN_AUTH}
+}
+
+function saveEnv() {
+    log "Saving env variables"
+
+    env > ${SAVED_VARS}
+
+    default_gateway=$(ip r | grep 'default via' | cut -d " " -f 3)
+    echo -e "default_gateway=${default_gateway}" >> ${SAVED_VARS}
+    local contents=$(cat ${SAVED_VARS})
+    log "Save env:%n${contents}"
+}
+
+function configChanged() {
+    diff ${CONFIG_DIR}/$1 ${VAR_DIR}/$1 &> /dev/null
+}
+
+# function internetAlive() {
+#     ping -c 1 -A google.com
+#     result=$?
+#     if [ $result -ne 0 ] ; then
+#         log "Internet is down!"
+#     fi
+#     echo $result
+# }
+
+function monitor() {
+    log "Running monitor process..."
+
+    task="monitor"
+    while [ "$shutting_down" == "no" ] ; do
+        changed=0
+        if ! configChanged vpn.ovpn ; then
+            log "VPN config changed. Restarting openvpn"
+            changed=1
+        elif ! configChanged vpn.auth ; then
+            log "VPN auth changed. Restarting openvpn"
+            changed=1
+        fi
+        if [ $changed -eq 1 ] ; then
+            saveVpnConfig
+            pkill -15 -x openvpn
+        fi
+        sleep ${RETRY_INTERVAL}
+    done
+
+    log "Exiting monitor"
+}
+
+function main() {
+    # Clear logs
+    rm -f ${VAR_DIR}/*
+
+    log "Starting OpenVPN-Proxy"
+    mkdir -p ${VAR_DIR} ${CONFIG_DIR} &> /dev/null
+
+    log "Configure sigterm handler"
+    trap sigtermHandler SIGTERM
+
+    if [ ! -f ${VPN_CONF_SRC} -o ! -f ${VPN_AUTH_SRC} ] ; then
+        log "Invalid VPN config"
+        exit 1
+    fi
+
+    # Save/load env variables
+    if [ -f ${SAVED_VARS} ] ; then
+        source ${SAVED_VARS}
+    else
+        saveEnv
+    fi
+
+    # Configure routes
+    ${SCRIPT_DIR}/setup-routes init
+
+    # Save config files to var
+    saveVpnConfig
+
+    # Run monitor process
+    monitor ${openvpn_pid} &
+    monitor_pid=$!
+    log "Monitor started with PID: ${monitor_pid}"
+
+    # Follow logs
+    tail -F ${OPENVPNPROXY_LOG} &
+    tail_pid=$!
+
+    while [ "$shutting_down" == "no" ] ; do
+        log "Call openvpn"
+        openvpn --config ${VPN_CONF} \
+            --auth-nocache \
+            --connect-retry-max 10 \
+            --auth-user-pass ${VPN_AUTH} \
+            --status ${VAR_DIR}/openvpn.status 15 \
+            --log ${VAR_DIR}/openvpn.log \
+            --pull-filter ignore "route-ipv6" \
+            --pull-filter ignore "ifconfig-ipv6" \
+            --script-security 2 \
+            --up-delay --up ${VPN_UP_SCRIPT} \
+            --down ${VPN_DOWN_SCRIPT} \
+            --up-restart \
+            --ping-restart ${RETRY_INTERVAL} \
+            --group openvpn \
+            --redirect-gateway autolocal \
+            --cd ${VAR_DIR} >> ${OPENVPNPROXY_LOG} 2>&1 &
+
+        openvpn_pid=$!
+        log "Openvpn started with PID: ${openvpn_pid}"
+
+        touch ${VAR_DIR}/openvpn-proxy.running
+        wait $openvpn_pid
+        rm -f ${VAR_DIR}/openvpn-proxy.running
+
+        if [ "$shutting_down" == "yes" ] ; then
+            log "Shutdown encountered"
+            break
+        fi
+
+        log "VPN down. Retrying openvpn connection after 5 seconds..."
+        sleep ${RETRY_INTERVAL};
+    done
+
+    # stop all background processes
+    stopBackgroundProcesses
+
+    log "Exiting..."
+}
+
+main "$@"
+
+exit 0
