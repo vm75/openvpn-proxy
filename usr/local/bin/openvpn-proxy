@@ -68,15 +68,6 @@ function configChanged() {
     diff -w ${CONFIG_DIR}/$1 ${VAR_DIR}/$1 &> /dev/null
 }
 
-# function internetAlive() {
-#     ping -c 1 -A google.com
-#     result=$?
-#     if [ ${result} -ne 0 ] ; then
-#         log "Internet is down!"
-#     fi
-#     echo ${result}
-# }
-
 function monitor() {
     log "Running monitor process..."
 
@@ -140,26 +131,29 @@ function main() {
 
     while [ ${shutting_down} == "no" ] ; do
         log "Call openvpn"
-        openvpn --config ${VPN_CONF} \
-            --auth-nocache \
-            --connect-retry-max 10 \
+        openvpn \
+            --client \
+            --cd ${VAR_DIR} \
+            --config ${VPN_CONF} \
             --auth-user-pass ${VPN_AUTH} \
-            --status ${VAR_DIR}/openvpn.status 15 \
+            --auth-nocache \
+            --verb 3 \
             --log ${VAR_DIR}/openvpn.log \
+            --status ${VAR_DIR}/openvpn.status ${RETRY_INTERVAL} \
+            --ping-restart ${RETRY_INTERVAL} \
+            --connect-retry-max 3 \
+            --script-security 2 \
+            --up ${VPN_UP_SCRIPT} --up-delay \
+            --down ${VPN_DOWN_SCRIPT} \
+            --up-restart \
             --pull-filter ignore route-ipv6 \
             --pull-filter ignore ifconfig-ipv6 \
             --pull-filter ignore block-outside-dns \
-            --script-security 2 \
-            --up-delay --up ${VPN_UP_SCRIPT} \
-            --down ${VPN_DOWN_SCRIPT} \
-            --up-restart \
-            --ping-restart ${RETRY_INTERVAL} \
             --group openvpn \
             --redirect-gateway def1 \
             --remote-cert-tls server \
-            --data-ciphers AES-256-GCM:AES-128-GCM:AES-256-CBC:AES-128-CBC \
-            --verb 1 \
-            --cd ${VAR_DIR} >> ${OPENVPNPROXY_LOG} 2>&1 &
+            --data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305:AES-256-CBC:AES-128-CBC \
+            >> ${OPENVPNPROXY_LOG} 2>&1 &
 
         openvpn_pid=$!
         log "Openvpn started with PID: ${openvpn_pid}"
@@ -173,7 +167,7 @@ function main() {
             break
         fi
 
-        log "VPN down. Retrying openvpn connection after 5 seconds..."
+        log "VPN down. Retrying openvpn connection after ${RETRY_INTERVAL} seconds..."
         sleep ${RETRY_INTERVAL};
     done
 
