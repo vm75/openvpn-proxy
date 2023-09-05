@@ -15,7 +15,7 @@ function main() {
         ${SCRIPT_DIR}/setup-routes down
 
         server=$(grep '^remote ' ${VPN_CONF} | awk '{print $2}')
-        nslookup $server &> /dev/null
+        nslookup ${server} &> /dev/null
         if [ $? -eq 0 ] ; then
             break
         fi

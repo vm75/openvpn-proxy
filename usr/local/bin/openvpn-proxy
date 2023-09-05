@@ -14,21 +14,21 @@ RETRY_INTERVAL=30
 
 function stopBackgroundProcesses() {
     log "Stopping background processes..."
-    if [ $monitor_pid ]; then
+    if [ ${monitor_pid} ]; then
         log "Stopping healthcheck script..."
-        kill -TERM $monitor_pid
+        kill -TERM ${monitor_pid}
         unset monitor_pid
     fi
 
-    if [ $openvpn_pid ]; then
+    if [ ${openvpn_pid} ]; then
         log "Stopping OpenVPN..."
-        kill -TERM $openvpn_pid
+        kill -TERM ${openvpn_pid}
         unset openvpn_pid
     fi
 
-    if [ $tail_pid ]; then
+    if [ ${tail_pid} ]; then
         log "Stopping tail process..."
-        kill -TERM $tail_pid
+        kill -TERM ${tail_pid}
         unset tail_pid
     fi
 }
@@ -71,17 +71,17 @@ function configChanged() {
 # function internetAlive() {
 #     ping -c 1 -A google.com
 #     result=$?
-#     if [ $result -ne 0 ] ; then
+#     if [ ${result} -ne 0 ] ; then
 #         log "Internet is down!"
 #     fi
-#     echo $result
+#     echo ${result}
 # }
 
 function monitor() {
     log "Running monitor process..."
 
     task="monitor"
-    while [ "$shutting_down" == "no" ] ; do
+    while [ ${shutting_down} == "no" ] ; do
         chmod a+r ${VAR_DIR}/*
         changed=0
         if ! configChanged vpn.ovpn ; then
@@ -91,7 +91,7 @@ function monitor() {
             log "VPN auth changed. Restarting openvpn"
             changed=1
         fi
-        if [ $changed -eq 1 ] ; then
+        if [ ${changed} -eq 1 ] ; then
             saveVpnConfig
             pkill -15 -x openvpn
         fi
@@ -138,7 +138,7 @@ function main() {
     tail -F ${OPENVPNPROXY_LOG} &
     tail_pid=$!
 
-    while [ "$shutting_down" == "no" ] ; do
+    while [ ${shutting_down} == "no" ] ; do
         log "Call openvpn"
         openvpn --config ${VPN_CONF} \
             --auth-nocache \
@@ -165,10 +165,10 @@ function main() {
         log "Openvpn started with PID: ${openvpn_pid}"
 
         touch ${VAR_DIR}/openvpn-proxy.running
-        wait $openvpn_pid
+        wait ${openvpn_pid}
         rm -f ${VAR_DIR}/openvpn-proxy.running
 
-        if [ "$shutting_down" == "yes" ] ; then
+        if [ ${shutting_down} == "yes" ] ; then
             log "Shutdown encountered"
             break
         fi

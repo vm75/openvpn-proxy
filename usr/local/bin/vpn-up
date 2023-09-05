@@ -42,15 +42,15 @@ function runTinyProxy() {
     local addr_eth=$(ip a show dev eth0 | grep "inet " | cut -d " " -f 6 | cut -d "/" -f 1)
     local addr_tun=$(ip a show dev tun0 | grep "inet " | cut -d " " -f 6 | cut -d "/" -f 1)
     sed -i \
-        -e "/Listen.*/c Listen $addr_eth" \
-        -e "/Bind.*/c Bind $addr_tun" \
+        -e "/Listen.*/c Listen ${addr_eth}" \
+        -e "/Bind.*/c Bind ${addr_tun}" \
         ${TINYPROXY_CONF}
 
-    tinyproxy -d -c ${TINYPROXY_CONF} >> ${TINYPROXY_LOG} 2>&1 &
+    tinyproxy -d -c ${TINYPROXY_CONF} > ${TINYPROXY_LOG} 2>&1 &
     tinyproxy_pid=$!
     log "Started Tinyproxy HTTP proxy server with PID: ${tinyproxy_pid}"
 
-    wait $tinyproxy_pid
+    wait ${tinyproxy_pid}
 
     log "Tinyproxy HTTP proxy server exited!"
 }
@@ -59,19 +59,19 @@ function runSockd() {
     log "Starting socks proxy..."
 
     task="sockd-wrapper"
-    if [ "$SOCKS_PROXY" != "on" ] ; then
-        log "SOCKS_PROXY is $SOCKS_PROXY"
+    if [ "${SOCKS_PROXY}" != "on" ] ; then
+        log "SOCKS_PROXY is ${SOCKS_PROXY}"
         return
     fi
 
     if [ ! -f "${SOCKD_CONF}" ] ; then
         cp ${SOCKD_CONF_TEMPLATE} ${SOCKD_CONF}
 
-        if [ $PROXY_USERNAME ] ; then
-            if [ $PROXY_PASSWORD ] ; then
+        if [ ${PROXY_USERNAME} ] ; then
+            if [ ${PROXY_PASSWORD} ] ; then
                 log "Configuring proxy authentication"
-                adduser -S -D -g $PROXY_USERNAME -H -h /dev/null $PROXY_USERNAME
-                echo "$PROXY_USERNAME:$PROXY_PASSWORD" | chpasswd 2> /dev/null
+                adduser -S -D -g ${PROXY_USERNAME} -H -h /dev/null ${PROXY_USERNAME}
+                echo "${PROXY_USERNAME}:${PROXY_PASSWORD}" | chpasswd 2> /dev/null
                 sed -i 's/socksmethod: none/socksmethod: username/' ${SOCKD_CONF}
             else
                 log "WARNING: Proxy username supplied without password. Starting SOCKS proxy without credentials"
@@ -79,7 +79,7 @@ function runSockd() {
         fi
     fi
 
-    sockd -f ${SOCKD_CONF} >> ${SOCKD_LOG} 2>&1 &
+    sockd -f ${SOCKD_CONF} > ${SOCKD_LOG} 2>&1 &
     sockd_pid=$!
     log "Started Dante SOCKS proxy server with PID: ${sockd_pid}"
 
