@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenVPN Proxy</title>
+  <link rel="icon" href="data:;base64,=">
+  <link rel="stylesheet" href="https://unpkg.com/bulma@latest/css/bulma.min.css">
+  <script src="https://unpkg.com/vue@latest/dist/vue.global.js"></script>
+  <script src="./utils/component-load.js"></script>
+</head>
+
+<body>
+  <div class="box container mt-5">
+    <h1 class="title">OpenVPN Proxy</h1>
+    <div class="columns">
+      <!-- Select Type Column -->
+      <div class="column">
+        <div class="field">
+          <label class="label">Select Type</label>
+          <div class="control">
+            <div class="select is-primary">
+              <select onchange="changeType(this)">
+                <option value="" disabled selected>Select your option</option>
+                <option value="template-editor">Template Editor</option>
+                <option value="config-editor">Config Editor</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Data Column -->
+      <div class="column">
+        <div class="field">
+          <label class="label">Data</label>
+          <div class="box">
+            <p id="data" class="content"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Component Section -->
+    <div class="field">
+      <label class="label">Component</label>
+      <div id="component-id" class="box"></div>
+      <div id="modal"></div>
+    </div>
+  </div>
+
+
+  <script>
+    function editString(data, onSave) {
+      injectComponent({
+        elementId: "modal",
+        name: 'edit-item',
+        source: './utils/edit-item.js',
+        data: {
+          title: 'Edit String',
+          type: 'string',
+          initialValue: data,
+          showOnLoad: true
+        },
+        methods: {
+          save: (data) => onSave(data)
+        }
+      });
+    }
+
+    function editTemplate(template, onSave) {
+      injectComponent({
+        elementId: "modal",
+        name: 'edit-template',
+        source: './config/edit-template.js',
+        data: {
+          name: template?.name,
+          content: template?.content,
+          showOnLoad: true
+        },
+        methods: {
+          save: (data) => {
+            fetch('/api/template/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+            }).then(() => {
+              onSave(data);
+            });
+          }
+        }
+      });
+    }
+
+    function deleteTemplate(name, onDelete) {
+      fetch(`/api/template/delete/${name}`, { method: 'DELETE' })
+        .then(() => onDelete(name));
+    }
+
+    function editConfig(config, onSave) {
+      fetch('/api/templates')
+        .then(response => response.json())
+        .then((data) => {
+          injectComponent({
+            elementId: "modal",
+            name: 'edit-config',
+            source: './config/edit-config.js',
+            data: {
+              templates: data,
+              name: config?.name,
+              templateName: config?.templateName,
+              fields: config?.fields,
+              data: config?.data,
+              showOnLoad: true
+            },
+            methods: {
+              save: (data) => {
+                fetch('/api/config/save', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(data)
+                }).then(() => {
+                  onSave(data);
+                });
+              }
+            }
+          });
+        });
+    }
+
+    function deleteConfig(name, onDelete) {
+      fetch(`/api/config/delete/${name}`, { method: 'DELETE' })
+        .then(() => onDelete(name));
+    }
+  </script>
+</body>
+
+</html>

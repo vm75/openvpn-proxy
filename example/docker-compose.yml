@@ -16,8 +16,9 @@ services:
     devices:
       - /dev/net/tun
     ports:
-      - 4444:8080 # http-proxy
-      - 5555:1080 # socks-proxy
+      - 8081:8081 # config-server
+      - 8080:8080 # http-proxy
+      - 1080:1080 # socks-proxy
       - 8112:8112 # deluge
       - 8221:8221 # storm
       - 9117:9117 # jackett

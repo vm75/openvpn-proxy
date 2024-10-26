@@ -107,6 +107,10 @@ function main() {
     # Init
     ontime_init
 
+    # Start config-server
+    log "Starting config-server..."
+    /opt/config-server/config-server --port 80 &
+
     # Clear logs
     rm -f ${VAR_DIR}/*
 
