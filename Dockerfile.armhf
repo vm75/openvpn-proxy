@@ -18,9 +18,6 @@ RUN apk --no-cache update
 RUN apk --no-cache upgrade
 RUN apk --no-cache --no-progress add ip6tables iptables openvpn bind-tools tinyproxy inotify-tools
 
-RUN addgroup -S socks && \
-    adduser -S -D -G socks -g "socks" -H -h /dev/null socks
-
 ARG IMAGE_VERSION
 ARG BUILD_DATE
 
@@ -33,12 +30,16 @@ COPY usr /usr
 ENV VPN_LOG_LEVEL=3 \
     KILL_SWITCH=on \
     HTTP_PROXY=on \
-    SOCKS_PROXY=on
+    SOCKS_PROXY=on \
+    DEPENDENCIES=""
 
 RUN mkdir -p /data
 RUN addgroup root openvpn
 
 VOLUME ["/data"]
+
+# expose ports for http-proxy and socks-proxy
+EXPOSE 8080/tcp 1080/tcp
 
 HEALTHCHECK --interval=60s --timeout=15s --start-period=120s \
              CMD ls /data/var/openvpn-proxy.running

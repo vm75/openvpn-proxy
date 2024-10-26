@@ -1,19 +1,15 @@
-version: '3.8'
-
 services:
   vpn:
     container_name: vpn
     image: vm75/openvpn-proxy:latest
     cap_add:
       - NET_ADMIN
-      - NET_RAW
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
       - KILL_SWITCH=on
       - SOCKS_PROXY=on
       - HTTP_PROXY=on
       - SUBNETS=192.168.1.0/24,10.89.0.0/16
+      - APP_DEPENDENCIES=libstdc++ icu-libs gcompat deluge
     dns:
       - 1.1.1.1
       - 1.0.0.1
@@ -27,46 +23,4 @@ services:
       - 9117:9117 # jackett
     volumes:
       - ./volumes/openvpn-proxy:/data
-    restart: unless-stopped
-
-  deluge:
-    image: ghcr.io/linuxserver/deluge
-    container_name: deluge
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - DELUGE_LOGLEVEL=warning #optional
-    network_mode: service:vpn
-    depends_on:
-      - vpn
-    volumes:
-      - ./volumes/downloads:/downloads
-      - ./volumes/deluge:/config
-    restart: unless-stopped
-
-  storm:
-    image: relvacode/storm
-    container_name: storm
-    environment:
-      - DELUGE_RPC_HOSTNAME=localhost
-      - DELUGE_RPC_USERNAME=localclient
-      - DELUGE_RPC_PASSWORD=c66894149ce6d45d1327008e954398174b780f05 # empty password
-      - DELUGE_RPC_VERSION=v2
-    network_mode: service:vpn
-    depends_on:
-      - deluge
-    restart: unless-stopped
-
-  jackett:
-    container_name: jackett
-    image: ghcr.io/linuxserver/jackett
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-    volumes:
-      - ./volumes/downloads/watch:/downloads # place where to put .torrent files for manual download
-      - ./volumes/jackett:/config # config files
-    network_mode: service:vpn
-    depends_on:
-      - vpn
     restart: unless-stopped

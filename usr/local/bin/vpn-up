@@ -107,6 +107,11 @@ function main() {
 
     # Configure DNS
     ${SCRIPT_DIR}/client.up >> ${OPENVPNPROXY_LOG} &
+
+    # User apps
+    if [ -f /data/apps.sh ] ; then
+        sh /data/apps.sh up &
+    fi
 }
 
 main "$@"

@@ -12,6 +12,17 @@ VPN_AUTH_SRC=${CONFIG_DIR}/vpn.auth
 
 RETRY_INTERVAL=30
 
+ontime_init() {
+    if [ ! -f /.initialized ] ; then
+        log "Installing dependencies..."
+        if [ -n "${APP_DEPENDENCIES}" ] ; then
+            apk --no-cache --no-progress add ${APP_DEPENDENCIES}
+        fi
+
+        touch /.initialized
+    fi
+}
+
 function stopBackgroundProcesses() {
     log "Stopping background processes..."
     if [ ${monitor_pid} ]; then
@@ -93,6 +104,9 @@ function monitor() {
 }
 
 function main() {
+    # Init
+    ontime_init
+
     # Clear logs
     rm -f ${VAR_DIR}/*
 

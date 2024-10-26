@@ -24,7 +24,7 @@ docker build -t vm75/openvpn-proxy .
 ```
 
 ### Creating and running a container
-The image requires the container be created with the `NET_ADMIN` and `NET_RAW` capabilities and `/dev/net/tun` accessible. Below are bare-bones examples for `docker run` and Compose; however, you'll probably want to do more than just run the VPN client. See the sections below to learn how to use the [proxies](#http_proxy-and-socks_proxy) and have [other containers use `openvpn-proxy`'s network stack](#using-with-other-containers).
+The image requires the container be created with the `NET_ADMIN` capability and `/dev/net/tun` accessible. Below are bare-bones examples for `docker run` and Compose; however, you'll probably want to do more than just run the VPN client. See the sections below to learn how to use the [proxies](#http_proxy-and-socks_proxy) and have [other containers use `openvpn-proxy`'s network stack](#using-with-other-containers).
 
 Create files vpn.ovpn & vpn.auth in a data folder. Store your VPN provider's ovpn file in vpn.ovpn & your credentials in vpn.auth (username=1st line, password=2nd line)
 
@@ -47,14 +47,12 @@ version: '2'
     image: vm75/openvpn-proxy:latest
     cap_add:
       - NET_ADMIN
-      - NET_RAW
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
       - KILL_SWITCH=on
       - SOCKS_PROXY=on
       - HTTP_PROXY=on
-      - SUBNETS=192.168.1.0/24,10.89.0.0/16
+      - SUBNETS=192.168.192.0/24,10.89.0.0/16
+      - APP_DEPENDENCIES=libstdc++ icu-libs gcompat deluge
     dns:
       - 1.1.1.1
       - 1.0.0.1
@@ -75,6 +73,7 @@ version: '2'
 | `VPN_LOG_LEVEL` | `3` | OpenVPN verbosity (`1`-`11`) |
 | `HTTP_PROXY` | `off` | The on/off status of Tinyproxy, the built-in HTTP proxy server. To enable, set to `on`. Any other value (including unset) will cause the proxy server to not start. It listens on port 8080. |
 | `SOCKS_PROXY` | `off` | The on/off status of Dante, the built-in SOCKS proxy server. To enable, set to `on`. Any other value (including unset) will cause the proxy server to not start. It listens on port 1080. |
+| `APP_DEPENDENCIES` | | Additional packages needed by custom apps. |
 
 ##### Environment variable considerations
 ###### `SUBNETS`
@@ -109,8 +108,7 @@ ports:
 In both cases, replace `<host_port>` and `<container_port>` with the port used by your connected container.
 
 ### Verifying functionality
-Once you have container running `vm75/openvpn-proxy`, run the following command to spin up a temporary container using `openvpn-proxy` for networking. The `wget -qO - ifconfig.me` bit will return the public IP of the container (and anything else using `openvpn-proxy` for networking). You should see an IP address owned by your VPN provider.
+Once you have container running `vm75/openvpn-proxy` (say with container name 'vpn'), run the following command. You should see an IP address owned by your VPN provider.
 ```bash
-docker run --rm -it --network=container:openvpn-proxy alpine wget -qO - ifconfig.me
+docker exec -it vpn wget -qO - ifconfig.me
 ```
-
