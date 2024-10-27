@@ -52,7 +52,6 @@ version: '2'
       - SOCKS_PROXY=on
       - HTTP_PROXY=on
       - SUBNETS=192.168.192.0/24,10.89.0.0/16
-      - APP_DEPENDENCIES=libstdc++ icu-libs gcompat deluge
     dns:
       - 1.1.1.1
       - 1.0.0.1
@@ -73,7 +72,6 @@ version: '2'
 | `VPN_LOG_LEVEL` | `3` | OpenVPN verbosity (`1`-`11`) |
 | `HTTP_PROXY` | `off` | The on/off status of Tinyproxy, the built-in HTTP proxy server. To enable, set to `on`. Any other value (including unset) will cause the proxy server to not start. It listens on port 8080. |
 | `SOCKS_PROXY` | `off` | The on/off status of Dante, the built-in SOCKS proxy server. To enable, set to `on`. Any other value (including unset) will cause the proxy server to not start. It listens on port 1080. |
-| `APP_DEPENDENCIES` | | Additional packages needed by custom apps. |
 
 ##### Environment variable considerations
 ###### `SUBNETS`

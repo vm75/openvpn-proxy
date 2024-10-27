@@ -14,9 +14,9 @@ RETRY_INTERVAL=30
 
 ontime_init() {
     if [ ! -f /.initialized ] ; then
-        log "Installing dependencies..."
-        if [ -n "${APP_DEPENDENCIES}" ] ; then
-            apk --no-cache --no-progress add ${APP_DEPENDENCIES}
+        log "Onetime setup for apps"
+        if [ -f /data/apps.sh ] ; then
+            /data/apps.sh setup
         fi
 
         touch /.initialized

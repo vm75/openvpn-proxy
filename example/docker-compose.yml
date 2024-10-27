@@ -9,7 +9,6 @@ services:
       - SOCKS_PROXY=on
       - HTTP_PROXY=on
       - SUBNETS=192.168.1.0/24,10.89.0.0/16
-      - APP_DEPENDENCIES=libstdc++ icu-libs gcompat deluge
     dns:
       - 1.1.1.1
       - 1.0.0.1
