@@ -8,8 +8,9 @@ SCRIPT_NAME=$(basename "$0")
 
 # dirs
 ETC_DIR=/usr/local/etc
-CONFIG_DIR=/data/config
-VAR_DIR=/data/var
+DATA_DIR=/data
+CONFIG_DIR=${DATA_DIR}/config
+VAR_DIR=${DATA_DIR}/var
 
 # files
 OPENVPNPROXY_LOG=${VAR_DIR}/openvpn-proxy.log

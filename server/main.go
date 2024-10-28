@@ -8,56 +8,54 @@ import (
 	"os"
 	"path/filepath"
 
-	"nginx-ui/common"
-	"nginx-ui/config"
+	"config-server/ovpn"
 
 	"github.com/gorilla/mux"
 )
 
-const (
-	templatesDir = "./templates"
-	configsDir   = "./configs"
-	staticDir    = "./static"
-)
+var staticDir = "./static"
 
-var m = config.Manager
-
-// List all templates
-func listTemplates(w http.ResponseWriter, r *http.Request) {
-	var templates = m.GetTemplates()
-	json.NewEncoder(w).Encode(templates)
+func errorLog(err error, exitCode int) {
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(exitCode)
 }
 
-// Get a single template
-func getTemplate(w http.ResponseWriter, r *http.Request) {
+// List all servers
+func listServers(w http.ResponseWriter, r *http.Request) {
+	var servers = ovpn.GetServers()
+	json.NewEncoder(w).Encode(servers)
+}
+
+// Get a single server
+func getServer(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	name := vars["name"]
-	template := m.GetTemplate(name)
-	if template == nil {
-		http.Error(w, "Template not found", http.StatusNotFound)
+	server := ovpn.GetServer(name)
+	if server == nil {
+		http.Error(w, "Server not found", http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(template)
+	json.NewEncoder(w).Encode(server)
 }
 
-// Create or update a template
-func saveTemplate(w http.ResponseWriter, r *http.Request) {
-	var tpl common.Template
-	_ = json.NewDecoder(r.Body).Decode(&tpl)
+// Create or update a server
+func saveServer(w http.ResponseWriter, r *http.Request) {
+	var svr ovpn.Server
+	_ = json.NewDecoder(r.Body).Decode(&svr)
 
-	err := m.SaveTemplate(tpl)
+	err := ovpn.SaveServer(svr)
 	if err != nil {
-		http.Error(w, "Failed to save template", http.StatusInternalServerError)
+		http.Error(w, "Failed to save server", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
 // Delete a template
-func deleteTemplate(w http.ResponseWriter, r *http.Request) {
+func deleteServer(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	name := vars["name"]
-	err := m.DeleteTemplate(name)
+	err := ovpn.DeleteServer(name)
 	if err != nil {
 		http.Error(w, "Failed to delete template", http.StatusInternalServerError)
 		return
@@ -65,18 +63,9 @@ func deleteTemplate(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// Get all configs
-func getConfigs(w http.ResponseWriter, r *http.Request) {
-	var configs = m.GetConfigs()
-	json.NewEncoder(w).Encode(configs)
-}
-
 // Get a specific config
 func getConfig(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	name := vars["name"]
-
-	config := m.GetConfig(name)
+	config := ovpn.GetProxySettings()
 	if config == nil {
 		http.Error(w, "Config not found", http.StatusNotFound)
 		return
@@ -87,30 +76,16 @@ func getConfig(w http.ResponseWriter, r *http.Request) {
 
 // Save a config (new or existing)
 func saveConfig(w http.ResponseWriter, r *http.Request) {
-	var config common.Config
-	err := json.NewDecoder(r.Body).Decode(&config)
+	var settings ovpn.ProxySettings
+	err := json.NewDecoder(r.Body).Decode(&settings)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	err = m.SaveConfig(config)
+	err = ovpn.SaveProxySettings(&settings)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
-// Delete a config
-func deleteConfig(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	name := vars["name"]
-
-	err := m.DeleteConfig(name)
-	if err != nil {
-		http.Error(w, "Failed to delete config", http.StatusInternalServerError)
 		return
 	}
 
@@ -128,52 +103,38 @@ func handleStaticFiles(r *mux.Router) {
 func main() {
 	ex, err := os.Executable()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		errorLog(err, 1)
 	}
 	err = os.Chdir(filepath.Dir(ex))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		errorLog(err, 1)
 	}
 
 	// Command-line flag for port
-	portPtr := flag.String("port", "", "Port to run the server on")
+	portPtr := flag.String("port", "8080", "Port to run the server on")
+	dataPtr := flag.String("data", "", "Directory to store data")
+	staticPtr := flag.String("static", "./static", "Directory of static files")
 	flag.Parse()
 
-	// Check command-line, then env, then default port
+	// Check command-line
 	port := *portPtr
-	if port == "" {
-		port = os.Getenv("PORT")
-		if port == "" {
-			port = "8080" // Default port if none is provided
-		}
-	}
+	dataDir := *dataPtr
+	staticDir = *staticPtr
 
-	// Create the templates directory if it doesn't exist
-	if _, err := os.Stat(templatesDir); os.IsNotExist(err) {
-		os.Mkdir(templatesDir, 0755)
-	}
-
-	// Create the configs directory if it doesn't exist
-	if _, err := os.Stat(configsDir); os.IsNotExist(err) {
-		os.Mkdir(configsDir, 0755)
-	}
+	ovpn.Init(dataDir)
 
 	// Create a new Gorilla Mux router
 	r := mux.NewRouter()
 
 	// Template-related routes
-	r.HandleFunc("/api/templates", listTemplates).Methods("GET")
-	r.HandleFunc("/api/template/{name}", getTemplate).Methods("GET")
-	r.HandleFunc("/api/template/save", saveTemplate).Methods("POST")
-	r.HandleFunc("/api/template/delete/{name}", deleteTemplate).Methods("DELETE")
+	r.HandleFunc("/api/servers", listServers).Methods("GET")
+	r.HandleFunc("/api/servers/{name}", getServer).Methods("GET")
+	r.HandleFunc("/api/servers/save", saveServer).Methods("POST")
+	r.HandleFunc("/api/servers/delete/{name}", deleteServer).Methods("DELETE")
 
 	// Config-related routes
-	r.HandleFunc("/api/configs", getConfigs).Methods("GET")
-	r.HandleFunc("/api/config/{name}", getConfig).Methods("GET")
-	r.HandleFunc("/api/config/save", saveConfig).Methods("POST")
-	r.HandleFunc("/api/config/delete/{name}", deleteConfig).Methods("DELETE")
+	r.HandleFunc("/api/settings", getConfig).Methods("GET")
+	r.HandleFunc("/api/settings/save", saveConfig).Methods("POST")
 
 	// Serve static files
 	handleStaticFiles(r)
@@ -182,7 +143,6 @@ func main() {
 	fmt.Printf("Server starting on port %s\n", port)
 	err = http.ListenAndServe(":"+port, r)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		errorLog(err, 1)
 	}
 }

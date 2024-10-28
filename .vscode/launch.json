@@ -12,7 +12,9 @@
             "program": "${workspaceFolder}/server/main.go",
             "args": [
                 "--port",
-                "8082"
+                "8082",
+                "--data",
+                "${workspaceFolder}/data"
             ]
         }
     ]

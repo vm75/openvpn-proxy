@@ -12,14 +12,14 @@ VPN_AUTH_SRC=${CONFIG_DIR}/vpn.auth
 
 RETRY_INTERVAL=30
 
-ontime_init() {
-    if [ ! -f /.initialized ] ; then
+apps_setup() {
+    if [ ! -f /.apps_initialized ] ; then
         log "Onetime setup for apps"
         if [ -f /data/apps.sh ] ; then
             /data/apps.sh setup
         fi
 
-        touch /.initialized
+        touch /.apps_initialized
     fi
 }
 
@@ -104,12 +104,12 @@ function monitor() {
 }
 
 function main() {
-    # Init
-    ontime_init
+    # Apps init
+    apps_setup
 
     # Start config-server
     log "Starting config-server..."
-    /opt/config-server/config-server --port 80 &
+    /opt/config-server/config-server --port 80 --data ${CONFIG_DIR} &
 
     # Clear logs
     rm -f ${VAR_DIR}/*
