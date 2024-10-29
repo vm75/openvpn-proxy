@@ -1,5 +1,5 @@
 const template = `
-  <table v-if="listLocal.length > 0" class="table is-striped">
+  <table v-if="listLocal.length > 0" class="table is-striped is-fullwidth">
     <thead>
       <tr>
         <th>Actions</th>

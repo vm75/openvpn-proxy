@@ -5,6 +5,19 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Server Init",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/server/main.go",
+            "args": [
+                "--port",
+                "8082",
+                "--data",
+                "${workspaceFolder}/data",
+            ]
+        },
+        {
             "name": "Server",
             "type": "go",
             "request": "launch",
@@ -14,7 +27,9 @@
                 "--port",
                 "8082",
                 "--data",
-                "${workspaceFolder}/data"
+                "${workspaceFolder}/data",
+                "--daemon",
+                "1",
             ]
         }
     ]

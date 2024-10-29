@@ -30,7 +30,7 @@ const binary = {
     };
   },
   template: `
-    <div class="select">
+    <div class="select is-fullwidth">
       <select v-model="internalValue" @change="emitInput">
         <option :value="true">{{ trueStr }}</option>
         <option :value="false">{{ falseStr }}</option>

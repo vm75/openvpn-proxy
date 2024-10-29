@@ -75,7 +75,25 @@ const template = `
 `;
 
 export default {
-  props: ["server", "showOnLoad"],
+  props: {
+    server: {
+      type: Object,
+      required: true,
+      default: () => {
+        return {
+          name: '',
+          username: '',
+          password: '',
+          endpoints: [],
+          template: '',
+        }
+      },
+    },
+    showOnLoad: {
+      type: Boolean,
+      default: false,
+    },
+  },
   data() {
     this.server.endpoints = this.server.endpoints || [];
     this.server.template = this.server.template || '';
@@ -83,13 +101,6 @@ export default {
       isVisible: this.showOnLoad || false,
       nameIsEditable: true,
     }
-  },
-  components: {
-    'modal': Vue.defineAsyncComponent(() => import('./modal.js')),
-    'list-editor': Vue.defineAsyncComponent(() => import('./utils/list-editor.js')),
-    'modal-array-item': Vue.defineAsyncComponent(() => import('./modal-value.js')),
-    'basic': Vue.defineAsyncComponent(() => import('./basic-input.js')),
-    'dynamic-form': Vue.defineAsyncComponent(() => import('./dynamic-form.js')),
   },
   template: template,
   methods: {

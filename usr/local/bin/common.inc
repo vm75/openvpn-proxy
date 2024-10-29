@@ -18,6 +18,10 @@ SAVED_VARS=${VAR_DIR}/env
 VPN_CONF=${VAR_DIR}/vpn.ovpn
 VPN_AUTH=${VAR_DIR}/vpn.auth
 
+# config files
+VPN_CONF_SRC=${CONFIG_DIR}/vpn.ovpn
+VPN_AUTH_SRC=${CONFIG_DIR}/vpn.auth
+
 # when OPENVPNPROXY_LOG exceeds 1MB, rotate it
 # maintain 5 rotated logs
 function logRotate() {

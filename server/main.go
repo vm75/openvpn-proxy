@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,12 +14,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var staticDir = "./static"
-
-func errorLog(err error, exitCode int) {
-	fmt.Fprintln(os.Stderr, err)
-	os.Exit(exitCode)
-}
+var staticDir *string
 
 // List all servers
 func listServers(w http.ResponseWriter, r *http.Request) {
@@ -64,18 +60,17 @@ func deleteServer(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get a specific config
-func getConfig(w http.ResponseWriter, r *http.Request) {
+func getSettings(w http.ResponseWriter, r *http.Request) {
 	config := ovpn.GetProxySettings()
 	if config == nil {
-		http.Error(w, "Config not found", http.StatusNotFound)
-		return
+		config = &ovpn.ProxySettings{}
 	}
 
 	json.NewEncoder(w).Encode(config)
 }
 
 // Save a config (new or existing)
-func saveConfig(w http.ResponseWriter, r *http.Request) {
+func saveSettings(w http.ResponseWriter, r *http.Request) {
 	var settings ovpn.ProxySettings
 	err := json.NewDecoder(r.Body).Decode(&settings)
 	if err != nil {
@@ -95,34 +90,12 @@ func saveConfig(w http.ResponseWriter, r *http.Request) {
 // Separate function to handle static files
 func handleStaticFiles(r *mux.Router) {
 	// Serve static files from /static and root (/)
-	fs := http.FileServer(http.Dir(staticDir))
+	fs := http.FileServer(http.Dir(*staticDir))
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 	r.PathPrefix("/").Handler(http.StripPrefix("/", fs)) // Serve "/" from staticDir
 }
 
-func main() {
-	ex, err := os.Executable()
-	if err != nil {
-		errorLog(err, 1)
-	}
-	err = os.Chdir(filepath.Dir(ex))
-	if err != nil {
-		errorLog(err, 1)
-	}
-
-	// Command-line flag for port
-	portPtr := flag.String("port", "8080", "Port to run the server on")
-	dataPtr := flag.String("data", "", "Directory to store data")
-	staticPtr := flag.String("static", "./static", "Directory of static files")
-	flag.Parse()
-
-	// Check command-line
-	port := *portPtr
-	dataDir := *dataPtr
-	staticDir = *staticPtr
-
-	ovpn.Init(dataDir)
-
+func server(port string) {
 	// Create a new Gorilla Mux router
 	r := mux.NewRouter()
 
@@ -133,16 +106,47 @@ func main() {
 	r.HandleFunc("/api/servers/delete/{name}", deleteServer).Methods("DELETE")
 
 	// Config-related routes
-	r.HandleFunc("/api/settings", getConfig).Methods("GET")
-	r.HandleFunc("/api/settings/save", saveConfig).Methods("POST")
+	r.HandleFunc("/api/settings", getSettings).Methods("GET")
+	r.HandleFunc("/api/settings/save", saveSettings).Methods("POST")
 
 	// Serve static files
 	handleStaticFiles(r)
 
 	// Start the server
 	fmt.Printf("Server starting on port %s\n", port)
-	err = http.ListenAndServe(":"+port, r)
+	err := http.ListenAndServe(":"+port, r)
 	if err != nil {
-		errorLog(err, 1)
+		log.Fatal(err)
 	}
+}
+
+func main() {
+	ex, err := os.Executable()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = os.Chdir(filepath.Dir(ex))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Command-line flag for port
+	port := flag.String("port", "8080", "Port to run the server on")
+	dataDir := flag.String("data", "", "Directory to store data")
+	staticDir = flag.String("static", "./static", "Directory of static files")
+	isDaemon := flag.Bool("daemon", false, "Run in daemon mode")
+	flag.Parse()
+
+	if !*isDaemon {
+		err = ovpn.Init(*dataDir, *isDaemon)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+	}
+
+	ovpn.Init(*dataDir, *isDaemon)
+	fmt.Println("Running in daemon mode")
+	server(*port)
+	os.Exit(0)
 }

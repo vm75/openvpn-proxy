@@ -13,7 +13,6 @@
 
 <body>
   <div class="box container mt-5">
-    <h1 class="title">OpenVPN Proxy</h1>
     <div id="app">
     </div>
     <div id="modal"></div>
@@ -21,72 +20,120 @@
 
   <script>
     Vue.createApp({
+      template: `
+        <section class="section">
+          <div class="container">
+            <h1 class="title">OpenVPN Proxy</h1>
+
+            <!-- Tabs -->
+            <div class="tabs is-boxed">
+              <ul>
+                <li :class="{ 'is-active': currentTab === 'settings' }">
+                  <a @click="currentTab = 'settings'">Proxy Settings</a>
+                </li>
+                <li :class="{ 'is-active': currentTab === 'servers' }">
+                  <a @click="currentTab = 'servers'">OpenVPN Servers</a>
+                </li>
+              </ul>
+            </div>
+
+            <!-- OpenVPN Proxy Settings -->
+            <div v-if="currentTab === 'settings'" class="box">
+              <form>
+                <div class="field">
+                  <label class="label">OpenVPN Provider</label>
+                  <div class="control select is-fullwidth">
+                    <select v-model="proxySettings.serverName">
+                      <option v-for="server in servers"
+                        :key="server.name"
+                        :value="server.name"
+                        :selected="server.name === proxySettings.serverName">{{ server.name }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Server Endpoint</label>
+                  <div class="control select is-fullwidth">
+                    <select v-model="proxySettings.serverEndpoint">
+                      <option v-for="endpoint in endpoints"
+                        :key="endpoint.name"
+                        :value="endpoint.name"
+                        :selected="endpoint.name === proxySettings.serverEndpoint">{{ endpoint.name }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Http Proxy</label>
+                  <div class="control is-fullwidth">
+                    <basic type="on-off" v-model:value="proxySettings.httpProxy"></basic>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Socks Proxy</label>
+                  <div class="control">
+                    <basic type="on-off" v-model:value="proxySettings.socksProxy"></basic>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">LAN Subnets</label>
+                  <div class="control">
+                    <inline-list :name="'Subnet'" v-model:entries="proxySettings.subnets" type="subnet">
+                    </inline-list>
+                  </div>
+                </div>
+              </form>
+              <div class="mt-4 buttons">
+                <button class="button is-success mx-auto" @click="saveProxySettings">Save</button>
+              </div>
+            </div>
+
+            <!-- Servers Tab -->
+            <div v-if="currentTab === 'servers'" class="box">
+              <list-editor
+                :name="'OpenVPN Servers'"
+                :list="servers"
+                :editItem="editServer"
+                :addItem="editServer"
+                :removeItem="deleteServer"
+                :displayString="serversDisplayString"
+                >
+              </list-editor>
+            </div>
+          </div>
+        </section>`,
       data() {
         return {
+          currentTab: 'settings',
           proxySettings: {
             serverName: '',
             serverEndpoint: '',
+            httpProxy: 'on',
+            socksProxy: 'on',
+            killSwitch: 'on',
+            subnets: [],
           },
           servers: [],
         }
       },
       components: {
-        'modal': Vue.defineAsyncComponent(() => import('./modal.js')),
         'list-editor': Vue.defineAsyncComponent(() => import('./utils/list-editor.js')),
-        'modal-array-item': Vue.defineAsyncComponent(() => import('./modal-value.js')),
-        'basic': Vue.defineAsyncComponent(() => import('./basic-input.js')),
-        'dynamic-form': Vue.defineAsyncComponent(() => import('./dynamic-form.js')),
+        'basic': Vue.defineAsyncComponent(() => import('./utils/basic-input.js')),
+        'inline-list': Vue.defineAsyncComponent(() => import('./utils/inline-list.js')),
       },
-      template: `
-        <div class="box">
-          <h2 class="subtitle">OpenVPN Proxy Settings</h2>
-          <section class="modal-card-body">
-            <div class="field">
-              <label class="label">OpenVPN Provider</label>
-              <div class="control select is-fullwidth">
-                <select v-model="proxySettings.serverName">
-                  <option v-for="server in servers"
-                    :key="server.name"
-                    :value="server.name"
-                    :selected="server.name === proxySettings.serverName">{{ server.name }}
-                  </option>
-                </select>
-              </div>
-            </div>
-            <div class="field">
-              <label class="label">Server Endpoint</label>
-              <div class="control select is-fullwidth">
-                <select v-model="proxySettings.serverEndpoint">
-                  <option v-for="endpoint in endpoints"
-                    :key="endpoint.name"
-                    :value="endpoint.name"
-                    :selected="endpoint.name === proxySettings.serverEndpoint">{{ endpoint.name }}
-                  </option>
-                </select>
-              </div>
-            </div>
-          </section>
-          <div class="mt-4 buttons">
-            <button class="button is-success mx-auto" @click="saveProxySettings">Save</button>
-          </div>
-        </div>
-        <div class="box">
-          <h2 class="subtitle">OpenVPN Servers</h2>
-          <div id="servers" class="box">
-            <list-editor
-              :name="'OpenVPN Servers'"
-              :list="servers"
-              :editItem="editServer"
-              :addItem="editServer"
-              :removeItem="deleteServer"
-              :displayString="serversDisplayString"
-              >
-            </list-editor>
-          </div>
-        </div>`,
       methods: {
         async reload() {
-          this.proxySettings = await fetch('/api/settings').then(response => response.json());
+          var settings = await fetch('/api/settings').then(response => response.json());
+          this.proxySettings = {
+            serverName: settings.serverName || '',
+            serverEndpoint: settings.serverEndpoint || '',
+            httpProxy: settings.httpProxy || 'on',
+            socksProxy: settings.socksProxy || 'on',
+            subnets: settings.subnets || [],
+            killSwitch: settings.killSwitch || 'on',
+            vpnLogLevel: settings.vpnLogLevel || 3
+          }
           this.servers = await fetch('/api/servers').then(response => response.json());
         },
         editServer: function (index) {

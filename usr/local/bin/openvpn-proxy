@@ -6,10 +6,6 @@
 VPN_UP_SCRIPT=${SCRIPT_DIR}/vpn-up
 VPN_DOWN_SCRIPT=${SCRIPT_DIR}/vpn-down
 
-# config files
-VPN_CONF_SRC=${CONFIG_DIR}/vpn.ovpn
-VPN_AUTH_SRC=${CONFIG_DIR}/vpn.auth
-
 RETRY_INTERVAL=30
 
 apps_setup() {
@@ -64,17 +60,6 @@ function saveVpnConfig() {
     dos2unix ${VPN_AUTH}
 }
 
-function saveEnv() {
-    log "Saving env variables"
-
-    env > ${SAVED_VARS}
-
-    default_gateway=$(ip r | grep 'default via' | cut -d " " -f 3)
-    echo -e "default_gateway=${default_gateway}" >> ${SAVED_VARS}
-    local contents=$(cat ${SAVED_VARS})
-    log "Save env:%n${contents}"
-}
-
 function configChanged() {
     diff -w ${CONFIG_DIR}/$1 ${VAR_DIR}/$1 &> /dev/null
 }
@@ -109,7 +94,8 @@ function main() {
 
     # Start config-server
     log "Starting config-server..."
-    /opt/config-server/config-server --port 80 --data ${CONFIG_DIR} &
+    /opt/config-server/config-server --port 80 --data ${CONFIG_DIR}
+    /opt/config-server/config-server --port 80 --data ${CONFIG_DIR} --daemon 1 &
 
     # Clear logs
     rm -f ${VAR_DIR}/*
@@ -123,13 +109,6 @@ function main() {
     if [ ! -f ${VPN_CONF_SRC} -o ! -f ${VPN_AUTH_SRC} ] ; then
         log "Invalid VPN config"
         exit 1
-    fi
-
-    # Save/load env variables
-    if [ -f ${SAVED_VARS} ] ; then
-        source ${SAVED_VARS}
-    else
-        saveEnv
     fi
 
     # Configure routes
@@ -148,6 +127,18 @@ function main() {
     tail_pid=$!
 
     while [ ${shutting_down} == "no" ] ; do
+        # re-load env variables
+        source ${SAVED_VARS}
+
+        if [ ! -f ${VAR_DIR}/ovpn.conf ] || [ ! -f ${VAR_DIR}/vpn.auth ] ; then
+            log "VPN config not found. Retrying openvpn connection after ${RETRY_INTERVAL} seconds..."
+            sleep ${RETRY_INTERVAL};
+            continue
+        fi
+
+        # Save config files to var
+        saveVpnConfig
+
         log "Call openvpn"
         openvpn \
             --client \
@@ -155,7 +146,7 @@ function main() {
             --config ${VPN_CONF} \
             --auth-user-pass ${VPN_AUTH} \
             --auth-nocache \
-            --verb 3 \
+            --verb ${VPN_LOG_LEVEL:-3} \
             --log ${VAR_DIR}/openvpn.log \
             --status ${VAR_DIR}/openvpn.status ${RETRY_INTERVAL} \
             --ping-restart ${RETRY_INTERVAL} \
