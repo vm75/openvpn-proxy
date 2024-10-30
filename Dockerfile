@@ -1,5 +1,5 @@
-# Stage 1: Build sockd
-FROM alpine AS build-sockd
+# Stage 1: Build dante sockd and openvpn-proxy
+FROM golang:alpine AS build
 
 # Set the working directory
 WORKDIR /workdir
@@ -14,20 +14,14 @@ RUN wget https://www.inet.no/dante/files/dante-$DANTE_VERSION.tar.gz --output-do
     ac_cv_func_sched_setscheduler=no ./configure --disable-client && \
     make install
 
-# Stage 2: Build config-server
-FROM golang:alpine AS build-config-server
-
-# Set the working directory
-WORKDIR /workdir
-
 # Copy the server code
 COPY server /workdir/server
 
 # Build go server
-# RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -C /workdir/server -ldflags="-s -w" -o /workdir/config-server
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -C /workdir/server -o /workdir/config-server
+# RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -C /workdir/server -ldflags="-s -w" -o /workdir/openvpn-proxy
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -C /workdir/server -o /workdir/openvpn-proxy
 
-# Stage 3: Create the final minimal image
+# Stage 2: Create the final minimal image
 FROM alpine
 
 RUN apk --no-cache update
@@ -42,28 +36,27 @@ LABEL version="$IMAGE_VERSION"
 LABEL created="$BUILD_DATE"
 
 # Copy binaries from build stage
-COPY --from=build-sockd /usr/local/sbin/sockd /usr/local/sbin/sockd
-COPY --from=build-config-server /workdir/config-server /opt/config-server/config-server
+COPY --from=build /usr/local/sbin/sockd /usr/local/sbin/sockd
+COPY --from=build /workdir/openvpn-proxy /opt/openvpn-proxy/openvpn-proxy
 
 # Copy the server code
 COPY usr /usr
-COPY server/static /opt/config-server/static
+COPY server/static /opt/openvpn-proxy/static
 
 ENV VPN_LOG_LEVEL=3 \
     KILL_SWITCH=on \
     HTTP_PROXY=on \
-    SOCKS_PROXY=on \
-    DEPENDENCIES=""
+    SOCKS_PROXY=on
 
 RUN mkdir -p /data
 RUN addgroup root openvpn
 
 VOLUME ["/data"]
 
-# expose ports for http-proxy, socks-proxy and config-server
+# expose ports for http-proxy, socks-proxy and openvpn-proxy
 EXPOSE 8080/tcp 1080/tcp 80/tcp
 
 HEALTHCHECK --interval=60s --timeout=15s --start-period=120s \
-             CMD ls /data/var/openvpn-proxy.running
+    CMD ls /data/var/openvpn.pid
 
-ENTRYPOINT [ "/usr/local/bin/openvpn-proxy" ]
+ENTRYPOINT [ "/opt/openvpn-proxy/openvpn-proxy" ]

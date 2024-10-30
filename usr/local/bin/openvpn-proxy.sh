@@ -92,11 +92,6 @@ function main() {
     # Apps init
     apps_setup
 
-    # Start config-server
-    log "Starting config-server..."
-    /opt/config-server/config-server --port 80 --data ${CONFIG_DIR}
-    /opt/config-server/config-server --port 80 --data ${CONFIG_DIR} --daemon 1 &
-
     # Clear logs
     rm -f ${VAR_DIR}/*
 

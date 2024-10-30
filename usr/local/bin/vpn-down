@@ -5,31 +5,15 @@
 function main() {
     loadSavedVars
 
-    log "Killing socks proxy"
-    pkill -x sockd
-    log "Killing http proxy"
-    pkill -x tinyproxy
-
-    while : ; do
-        # Configure routes
-        ${SCRIPT_DIR}/setup-routes down
-
-        server=$(grep '^remote ' ${VPN_CONF} | awk '{print $2}')
-        nslookup ${server} &> /dev/null
-        if [ $? -eq 0 ] ; then
-            break
-        fi
-        log "Unable to reach server. Trying again..."
-        sleep 1
-    done
-
-    # Configure DNS
-    ${SCRIPT_DIR}/client.down >> ${OPENVPNPROXY_LOG} &
-
     # User apps
     if [ -f /data/apps.sh ] ; then
         sh /data/apps.sh down &
     fi
+
+    # log "Killing socks proxy"
+    # pkill -9 -x sockd
+    log "Killing http proxy"
+    pkill -9 -x tinyproxy
 }
 
 main "$@"

@@ -1,0 +1,25 @@
+#!/bin/sh
+
+. /src/test/var/env
+
+env > /src/test/var/vpn-up.log
+echo "$@" >> /src/test/var/vpn-up.log
+
+echo "nameserver ${vpn_dns}" > /etc/resolv.conf
+
+# Remove all existing default routes
+ip route del default
+
+# Default route for all traffic through the VPN
+ip route add default via ${vpn_gw} dev tun0
+
+# Flush existing rules to start fresh
+iptables -F
+
+# Allow incoming ESTABLISHED and RELATED connections on the VPN interface
+iptables -A INPUT -i tun0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# Drop all other incoming connections on the VPN interface
+iptables -A INPUT -i tun0 -j DROP
+
+exit 0

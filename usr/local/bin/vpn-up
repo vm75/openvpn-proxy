@@ -46,7 +46,7 @@ function runTinyProxy() {
         -e "/Bind.*/c Bind ${addr_tun}" \
         ${TINYPROXY_CONF}
 
-    tinyproxy -d -c ${TINYPROXY_CONF} > ${TINYPROXY_LOG} 2>&1 &
+    /usr/bin/tinyproxy -d -c ${TINYPROXY_CONF} > ${TINYPROXY_LOG} 2>&1 &
     tinyproxy_pid=$!
     log "Started Tinyproxy HTTP proxy server with PID: ${tinyproxy_pid}"
 
@@ -61,6 +61,13 @@ function runSockd() {
     task="sockd-wrapper"
     if [ "${SOCKS_PROXY}" != "on" ] ; then
         log "SOCKS_PROXY is ${SOCKS_PROXY}"
+        return
+    fi
+
+    # if sockd is running, return
+    ps | grep sockd | grep -v grep &> /dev/null
+    if [ $? -eq 0 ] ; then
+        log "Dante SOCKS proxy server is already running"
         return
     fi
 
@@ -79,7 +86,7 @@ function runSockd() {
         fi
     fi
 
-    sockd -f ${SOCKD_CONF} > ${SOCKD_LOG} 2>&1 &
+    /usr/local/sbin/sockd -f ${SOCKD_CONF} > ${SOCKD_LOG} 2>&1 &
     sockd_pid=$!
     log "Started Dante SOCKS proxy server with PID: ${sockd_pid}"
 
@@ -91,22 +98,11 @@ function runSockd() {
 function main() {
     loadSavedVars
 
-    until ip address show dev tun0 &> /dev/null ; do
-        log "waiting..."
-        sleep 1
-    done
-
     # Start http proxy
     runTinyProxy&
 
     # Start socks proxy
     runSockd&
-
-    # Configure routes
-    ${SCRIPT_DIR}/setup-routes up
-
-    # Configure DNS
-    ${SCRIPT_DIR}/client.up >> ${OPENVPNPROXY_LOG} &
 
     # User apps
     if [ -f /data/apps.sh ] ; then

@@ -8,37 +8,37 @@ function main() {
     log "Configure routes for vpn-$1"
 
     if [ "$1" == "down" ] ; then
-        log "Add default gateway to route"
+        # Remove all existing default routes
+        ip route del default
+
+        # Add default gateway
         ip route add default via ${DEFAULT_GATEWAY} dev eth0
+
+        # Flush existing rules (to ensure clean slate)
+        iptables -F
+
+        # Allow related and established connections (for existing sessions to work)
+        iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+        # Allow incoming connections only on port 8080
+        iptables -A INPUT -p tcp --dport 8080 -j ACCEPT
+        iptables -A INPUT -p tcp -j DROP
     elif [ "$1" == "up" ] ; then
-        log "Remove default gateway from route"
-        ip route del default via ${DEFAULT_GATEWAY} dev eth0
+        # Remove all existing default routes
+        ip route del default
+
+        # Default route for all traffic through the VPN
+        # ip route add default via 10.100.0.1 dev tun0
+
+        # Flush existing rules to start fresh
+        iptables -F
+
+        # Allow incoming ESTABLISHED and RELATED connections on the VPN interface
+        iptables -A INPUT -i tun0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+        # Drop all other incoming connections on the VPN interface
+        iptables -A INPUT -i tun0 -j DROP
     fi
-
-    log "Flush iptables rules"
-    iptables -F
-
-    if [ "$1" == "down" ] ; then
-        log "Set route to DNS"
-        iptables -A OUTPUT -o eth0 -p udp --dport 53 -j ACCEPT
-        local protocol=$(grep '^proto ' ${VPN_CONF} | awk '{print $2}')
-        local port=$(grep '^remote ' ${VPN_CONF} | awk '{print $3}')
-        iptables -A OUTPUT -o eth0 -p ${protocol} --dport ${port} -j ACCEPT
-        iptables -A OUTPUT -o eth0 -j REJECT
-    else
-        log "Setting subnet routes"
-        for subnet in ${SUBNETS//,/ }; do
-            # create a route to it and...
-            ip route add ${subnet} via ${DEFAULT_GATEWAY} dev eth0
-            # allow connections
-            iptables -A INPUT -s ${subnet} -j ACCEPT
-        done
-    fi
-
-    log "Set default routes"
-    iptables -A INPUT -j ACCEPT -m state --state ESTABLISHED
-    iptables -A INPUT -i lo -j ACCEPT
-    iptables -A OUTPUT -o lo -j ACCEPT
 }
 
 main "$@"

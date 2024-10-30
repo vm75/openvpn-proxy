@@ -1,4 +1,4 @@
-package ovpn
+package daemon
 
 import (
 	"database/sql"
@@ -29,25 +29,46 @@ type ProxySettings struct {
 	SocksProxy     string   `json:"socksProxy"`
 	Subnets        []string `json:"subnets"`
 	VpnLogLevel    int      `json:"vpnLogLevel"`
+	RetryInterval  int      `json:"retryInterval"`
 }
 
-var configDir = ""
 var db *sql.DB = nil
+var ConfigDir = ""
+var VarDir = ""
+var ConfigFile = ""
+var AuthFile = ""
+var SettingsFile = ""
+var PidFile = ""
+var OpenVpnLogFile = ""
+var OpenVpnStatusFile = ""
+var DefaultGateway = ""
 
-func Init(dataDir string, isDaemon bool) error {
-	configDir = filepath.Join(dataDir, "config")
-	var dbPath = filepath.Join(configDir, "settings.db")
+func Init(dataDir string) error {
+	ConfigDir = filepath.Join(dataDir, "config")
+	VarDir = filepath.Join(dataDir, "var")
+	ConfigFile = filepath.Join(VarDir, "vpn.ovpn")
+	AuthFile = filepath.Join(VarDir, "vpn.auth")
+	SettingsFile = filepath.Join(ConfigDir, "settings.json")
+	PidFile = filepath.Join(VarDir, "openvpn.pid")
+	OpenVpnLogFile = filepath.Join(VarDir, "openvpn.log")
+	OpenVpnStatusFile = filepath.Join(VarDir, "openvpn.status")
 
-	if isDaemon {
-		db, _ = sql.Open("sqlite3", dbPath)
-		return nil
-	}
+	var dbPath = filepath.Join(ConfigDir, "settings.db")
 
 	var err error
-	err = os.MkdirAll(configDir, 0755)
+	err = os.MkdirAll(ConfigDir, 0755)
 	if err != nil {
 		log.Fatal(err)
 		return err
+	}
+
+	cmd := exec.Command("ip", "r")
+
+	// Capture standard output and standard error
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		// get line starting with default via and get the following ip in that line
+		DefaultGateway = strings.Split(strings.Split(string(output), "default via ")[1], " ")[0]
 	}
 
 	var settings = GetProxySettings()
@@ -170,7 +191,7 @@ func DeleteServer(name string) error {
 
 // Proxy config is saved as a json file in the data directory
 func GetProxySettings() *ProxySettings {
-	file, err := os.ReadFile(filepath.Join(configDir, "settings.json"))
+	file, err := os.ReadFile(SettingsFile)
 	if err != nil {
 		return nil
 	}
@@ -186,19 +207,24 @@ func saveEnv(settings ProxySettings) error {
 	sb.WriteString(fmt.Sprintf("SOCKS_PROXY=%s\n", settings.SocksProxy))
 	sb.WriteString(fmt.Sprintf("VPN_LOG_LEVEL=%d\n", settings.VpnLogLevel))
 	sb.WriteString(fmt.Sprintf("HTTP_PROXY=%s\n", settings.HttpProxy))
+	sb.WriteString(fmt.Sprintf("DEFAULT_GATEWAY=%s\n", DefaultGateway))
 
-	cmd := exec.Command("ip", "r")
+	return os.WriteFile(filepath.Join(VarDir, "env"), []byte(sb.String()), 0755)
+}
 
-	// Capture standard output and standard error
-	output, err := cmd.CombinedOutput()
-
-	if err == nil {
-		// get line starting with default via and get the following ip in that line
-		ip := strings.Split(strings.Split(string(output), "default via ")[1], " ")[0]
-		sb.WriteString(fmt.Sprintf("DEFAULT_GATEWAY=%s\n", ip))
+func updateContent(content string, file string) (bool, error) {
+	fileContent, err := os.ReadFile(file)
+	if err != nil {
+		return true, nil
 	}
-
-	return os.WriteFile(filepath.Join(configDir, "env"), []byte(sb.String()), 0755)
+	if string(fileContent) == content {
+		return false, nil
+	}
+	err = os.WriteFile(file, []byte(content), 0644)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func saveOvpnConfig(settings ProxySettings) error {
@@ -226,15 +252,21 @@ func saveOvpnConfig(settings ProxySettings) error {
 		ovpn = strings.ReplaceAll(ovpn, "{{"+key+"}}", value)
 	}
 
-	var err = os.WriteFile(filepath.Join(configDir, "vpn.ovpn"), []byte(ovpn), 0644)
-	if err != nil {
-		return err
+	auth := fmt.Sprintf("%s\n%s\n", server.Username, server.Password)
+
+	configUpdated, configErr := updateContent(ovpn, ConfigFile)
+	if configErr != nil {
+		return configErr
+	}
+	authUpdated, authErr := updateContent(auth, AuthFile)
+	if authErr != nil {
+		return authErr
 	}
 
-	auth := fmt.Sprintf("%s\n%s\n", server.Username, server.Password)
-	err = os.WriteFile(filepath.Join(configDir, "vpn.auth"), []byte(auth), 0644)
-	if err != nil {
-		return err
+	if configUpdated || authUpdated {
+		log.Println("Configuration updated, restarting OpenVPN")
+		StopOpenVPN()
+		StartOpenVPNLoop()
 	}
 
 	return nil
@@ -246,7 +278,7 @@ func SaveProxySettings(settings *ProxySettings) error {
 		log.Fatal(err)
 	}
 
-	err = os.WriteFile(filepath.Join(configDir, "settings.json"), file, 0644)
+	err = os.WriteFile(SettingsFile, file, 0644)
 	if err != nil {
 		log.Fatal(err)
 		return err

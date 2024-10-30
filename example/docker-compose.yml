@@ -15,7 +15,7 @@ services:
     devices:
       - /dev/net/tun
     ports:
-      - 8081:8081 # config-server
+      - 8081:8081 # openvpn-proxy
       - 8080:8080 # http-proxy
       - 1080:1080 # socks-proxy
       - 8112:8112 # deluge

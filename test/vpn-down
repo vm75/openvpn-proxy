@@ -1,0 +1,28 @@
+#!/bin/sh
+
+. /src/test/var/env
+
+env > /src/test/var/vpn-down.log
+echo "$@" >> /src/test/var/vpn-down.log
+
+# Add nameserver
+echo "search dns.podman" > /etc/resolv.conf
+echo "nameserver ${host_gw}" >> /etc/resolv.conf
+
+# Remove all existing default routes
+ip route del default
+
+# Add default gateway
+ip route add default via ${host_gw} dev eth0
+
+# Flush existing rules (to ensure clean slate)
+iptables -F
+
+# Allow related and established connections (for existing sessions to work)
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# Allow incoming connections only on port 80
+iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+iptables -A INPUT -p tcp -j DROP
+
+exit 0

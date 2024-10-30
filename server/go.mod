@@ -1,4 +1,4 @@
-module config-server
+module openvpn-proxy
 
 go 1.23.1
 
