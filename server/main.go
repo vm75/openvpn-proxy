@@ -40,7 +40,7 @@ func main() {
 	go func() {
 		<-sigChan
 		log.Println("SIGTERM received, shutting down...")
-		daemon.ShutdownOpenVPN()
+		daemon.StopVPN()
 		os.Exit(0)
 	}()
 
@@ -71,6 +71,6 @@ func main() {
 	globalInit(*dataDir)
 
 	daemon.Init(*dataDir)
-	daemon.StartOpenVPNLoop()
+	daemon.StartVPN()
 	daemon.WebServer(*port)
 }

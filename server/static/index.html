@@ -7,8 +7,43 @@
   <title>OpenVPN Proxy</title>
   <link rel="icon" href="data:;base64,=">
   <link rel="stylesheet" href="https://unpkg.com/bulma@latest/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
   <script src="https://unpkg.com/vue@latest/dist/vue.global.js"></script>
   <script src="./utils/component-load.js"></script>
+  <style>
+    .tooltip {
+      position: relative;
+      display: inline-block;
+    }
+
+    /* Tooltip text */
+    .tooltip .tooltip-text {
+      visibility: hidden;
+      width: auto;
+      background-color: black;
+      color: white;
+      text-align: center;
+      padding: 8px;
+      border-radius: 4px;
+      opacity: 0.8;
+      /* Set opacity */
+      position: absolute;
+      bottom: -35px;
+      /* Position below the button */
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      /* Prevent line break */
+      z-index: 1;
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    /* Show the tooltip when hovering over the tooltip container */
+    .tooltip:hover .tooltip-text {
+      visibility: visible;
+    }
+  </style>
 </head>
 
 <body>
@@ -38,54 +73,134 @@
             </div>
 
             <!-- OpenVPN Proxy Settings -->
-            <div v-if="currentTab === 'settings'" class="box">
-              <form>
-                <div class="field">
-                  <label class="label">OpenVPN Provider</label>
-                  <div class="control select is-fullwidth">
-                    <select v-model="proxySettings.serverName">
-                      <option v-for="server in servers"
-                        :key="server.name"
-                        :value="server.name"
-                        :selected="server.name === proxySettings.serverName">{{ server.name }}
-                      </option>
-                    </select>
+            <div v-if="currentTab === 'settings'">
+              <div class="columns is-flex">
+                <div class="container column">
+                  <div class="container box" style="height: 100%;">
+                    <div class="level">
+                      <div class="level-left">
+                        <h3 class="title is-4">VPN Server Info</h3>
+                      </div>
+                      <div class="level-right">
+                    <div class="buttons">
+                      <div class="tooltip">
+                        <button v-if="!vpnStatus.running" class="button is-small is-success" @click="vpnCommand('start')">
+                          <span class="icon">
+                            <i class="fas fa-play"></i>
+                          </span>
+                        </button>
+                        <span class="tooltip-text">Start OpenVPN Server</span>
+                      </div>
+                      <div class="tooltip">
+                        <button v-if="vpnStatus.running" class="button is-small is-warning" @click="vpnCommand('stop')">
+                          <span class="icon">
+                            <i class="fas fa-stop"></i>
+                          </span>
+                        </button>
+                        <span class="tooltip-text">Stop OpenVPN Server</span>
+                      </div>
+                      <div class="tooltip">
+                        <button v-if="vpnStatus.running" class="button is-small is-info" @click="vpnCommand('restart')">
+                          <span class="icon">
+                            <i class="fas fa-redo"></i>
+                          </span>
+                        </button>
+                        <span class="tooltip-text">Restart OpenVPN Server</span>
+                      </div>
+                      <div class="tooltip">
+                        <button v-if="vpnStatus.running" class="button is-small is-light" @click="refreshInfo">
+                          <span class="icon">
+                            <i class="fas fa-sync-alt"></i>
+                          </span>
+                        </button>
+                        <span class="tooltip-text">Refresh Status</span>
+                      </div>
+                    </div>
+                      </div>
+                    </div>
+                    <div v-if="vpnStatus.running">
+                      <div class="container">
+                        <div class="columns">
+                          <div class="column is-3 has-text-weight-bold">IP Address:</div>
+                          <div class="column" id="ip">{{ vpnStatus.ipInfo.ip }}</div>
+                        </div>
+
+                        <div class="columns">
+                          <div class="column is-3 has-text-weight-bold">Organization:</div>
+                          <div class="column" id="org">{{ vpnStatus.ipInfo.org }}</div>
+                        </div>
+
+                        <div class="columns">
+                          <div class="column is-3 has-text-weight-bold">Location:</div>
+                          <div class="column" id="location">{{ vpnStatus.ipInfo.city }}, {{ vpnStatus.ipInfo.country }}</div>
+                        </div>
+
+                        <div class="columns">
+                          <div class="column is-3 has-text-weight-bold">Timezone:</div>
+                          <div class="column" id="timezone">{{ vpnStatus.ipInfo.timezone }}</div>
+                        </div>
+                      </div>
+                      <!-- Map Display -->
+                      <location-map class="mt-4"
+                        v-model:latitude="vpnStatus.ipInfo.loc.split(',')[0]"
+                        v-model:longitude="vpnStatus.ipInfo.loc.split(',')[1]"
+                        v-model:city="vpnStatus.ipInfo.city">
+                      </location-map>
+                    </div>
                   </div>
                 </div>
-                <div class="field">
-                  <label class="label">Server Endpoint</label>
-                  <div class="control select is-fullwidth">
-                    <select v-model="proxySettings.serverEndpoint">
-                      <option v-for="endpoint in endpoints"
-                        :key="endpoint.name"
-                        :value="endpoint.name"
-                        :selected="endpoint.name === proxySettings.serverEndpoint">{{ endpoint.name }}
-                      </option>
-                    </select>
+                <div class="container column">
+                  <div class="container box" style="height: 100%;">
+                    <form>
+                      <div class="field">
+                        <label class="label">OpenVPN Provider</label>
+                        <div class="control select is-fullwidth">
+                          <select v-model="proxySettings.serverName">
+                            <option v-for="server in servers"
+                              :key="server.name"
+                              :value="server.name"
+                              :selected="server.name === proxySettings.serverName">{{ server.name }}
+                            </option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="field">
+                        <label class="label">Server Endpoint</label>
+                        <div class="control select is-fullwidth">
+                          <select v-model="proxySettings.serverEndpoint">
+                            <option v-for="endpoint in endpoints"
+                              :key="endpoint.name"
+                              :value="endpoint.name"
+                              :selected="endpoint.name === proxySettings.serverEndpoint">{{ endpoint.name }}
+                            </option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="field">
+                        <label class="label">Http Proxy</label>
+                        <div class="control is-fullwidth">
+                          <basic type="on-off" v-model:value="proxySettings.httpProxy"></basic>
+                        </div>
+                      </div>
+                      <div class="field">
+                        <label class="label">Socks Proxy</label>
+                        <div class="control">
+                          <basic type="on-off" v-model:value="proxySettings.socksProxy"></basic>
+                        </div>
+                      </div>
+                      <div class="field">
+                        <label class="label">LAN Subnets</label>
+                        <div class="control">
+                          <inline-list :name="'Subnet'" v-model:entries="proxySettings.subnets" type="subnet">
+                          </inline-list>
+                        </div>
+                      </div>
+                    </form>
+                    <div class="mt-4 buttons">
+                      <button class="button is-success mx-auto" @click="saveProxySettings">Save</button>
+                    </div>
                   </div>
                 </div>
-                <div class="field">
-                  <label class="label">Http Proxy</label>
-                  <div class="control is-fullwidth">
-                    <basic type="on-off" v-model:value="proxySettings.httpProxy"></basic>
-                  </div>
-                </div>
-                <div class="field">
-                  <label class="label">Socks Proxy</label>
-                  <div class="control">
-                    <basic type="on-off" v-model:value="proxySettings.socksProxy"></basic>
-                  </div>
-                </div>
-                <div class="field">
-                  <label class="label">LAN Subnets</label>
-                  <div class="control">
-                    <inline-list :name="'Subnet'" v-model:entries="proxySettings.subnets" type="subnet">
-                    </inline-list>
-                  </div>
-                </div>
-              </form>
-              <div class="mt-4 buttons">
-                <button class="button is-success mx-auto" @click="saveProxySettings">Save</button>
               </div>
             </div>
 
@@ -106,6 +221,11 @@
       data() {
         return {
           currentTab: 'settings',
+          vpnStatus: {
+            "running": false,
+            "ipInfo": {
+            }
+          },
           proxySettings: {
             serverName: '',
             serverEndpoint: '',
@@ -121,6 +241,7 @@
         'list-editor': Vue.defineAsyncComponent(() => import('./utils/list-editor.js')),
         'basic': Vue.defineAsyncComponent(() => import('./utils/basic-input.js')),
         'inline-list': Vue.defineAsyncComponent(() => import('./utils/inline-list.js')),
+        'location-map': Vue.defineAsyncComponent(() => import('./utils/location-map.js')),
       },
       methods: {
         async reload() {
@@ -177,6 +298,16 @@
             },
             body: JSON.stringify(this.proxySettings)
           });
+        },
+        vpnCommand: function (cmd) {
+          fetch(`/api/vpn/${cmd}`, {
+            method: 'POST',
+          });
+        },
+        refreshInfo: function () {
+          fetch('/api/vpn/status').then(response => response.json()).then(data => {
+            this.vpnStatus = data;
+          });
         }
       },
       computed: {
@@ -187,10 +318,14 @@
             }
           }
           return [];
-        }
+        },
       },
       mounted() {
         this.reload();
+        this.refreshInfo();
+        setInterval(() => {
+          this.refreshInfo();
+        }, 15000);
       }
     }).mount('#app')
   </script>

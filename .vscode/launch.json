@@ -15,7 +15,6 @@
                 "8082",
                 "--data",
                 "${workspaceFolder}/test",
-                "tun0"
             ],
             "env": {
                 "route_vpn_gateway": "10.100.0.1",

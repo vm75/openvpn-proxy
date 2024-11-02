@@ -79,3 +79,52 @@ function injectComponent({ name, source, elementId, data = {}, methods = {}, ref
 
   return app._instance;
 }
+
+function injectStyle(id, css) {
+  if (isLoaded(id)) {
+    return false;
+  }
+
+  // Create a <style> element
+  const style = document.createElement('style');
+  style.id = id;
+  style.textContent = css
+
+  // Append the <style> element to the <head> of the document
+  document.head.appendChild(style);
+}
+
+
+function injectStyleUrl(url) {
+  if (isLoaded(url)) {
+    return false;
+  }
+  // Create a <link> element
+  const link = document.createElement('link');
+  link.id = url;
+  link.rel = 'stylesheet';
+  link.href = url;
+  document.head.appendChild(link);
+
+  return true;
+}
+
+function injectScriptUrl(url, onload = null) {
+  if (isLoaded(url)) {
+    return false;
+  }
+  // Create a <script> element
+  const script = document.createElement('script');
+  script.id = url;
+  script.src = url;
+  if (onload) {
+    script.onload = onload;
+  }
+  document.head.appendChild(script);
+
+  return true;
+}
+
+function isLoaded(url) {
+  return !!document.getElementById(url);
+}

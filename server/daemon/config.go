@@ -28,6 +28,8 @@ type ProxySettings struct {
 	HttpProxy      string   `json:"httpProxy"`
 	SocksProxy     string   `json:"socksProxy"`
 	Subnets        []string `json:"subnets"`
+	ProxyUsername  string   `json:"proxyUsername"`
+	ProxyPassword  string   `json:"proxyPassword"`
 	VpnLogLevel    int      `json:"vpnLogLevel"`
 	RetryInterval  int      `json:"retryInterval"`
 }
@@ -42,6 +44,20 @@ var PidFile = ""
 var OpenVpnLogFile = ""
 var OpenVpnStatusFile = ""
 var DefaultGateway = ""
+
+func NewProxySettings() *ProxySettings {
+	return &ProxySettings{
+		ServerName:     "",
+		ServerEndpoint: "",
+		HttpProxy:      "",
+		SocksProxy:     "",
+		Subnets:        []string{},
+		ProxyUsername:  "",
+		ProxyPassword:  "",
+		VpnLogLevel:    0,
+		RetryInterval:  3600,
+	}
+}
 
 func Init(dataDir string) error {
 	ConfigDir = filepath.Join(dataDir, "config")
@@ -193,7 +209,7 @@ func DeleteServer(name string) error {
 func GetProxySettings() *ProxySettings {
 	file, err := os.ReadFile(SettingsFile)
 	if err != nil {
-		return nil
+		return NewProxySettings()
 	}
 	var settings ProxySettings
 	json.Unmarshal(file, &settings)
@@ -265,8 +281,8 @@ func saveOvpnConfig(settings ProxySettings) error {
 
 	if configUpdated || authUpdated {
 		log.Println("Configuration updated, restarting OpenVPN")
-		StopOpenVPN()
-		StartOpenVPNLoop()
+		RestartVPN()
+		StartVPN()
 	}
 
 	return nil

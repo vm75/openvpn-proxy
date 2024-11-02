@@ -18,8 +18,7 @@ RUN wget https://www.inet.no/dante/files/dante-$DANTE_VERSION.tar.gz --output-do
 COPY server /workdir/server
 
 # Build go server
-# RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -C /workdir/server -ldflags="-s -w" -o /workdir/openvpn-proxy
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -C /workdir/server -o /workdir/openvpn-proxy
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -C /workdir/server -ldflags="-s -w" -o /workdir/openvpn-proxy
 
 # Stage 2: Create the final minimal image
 FROM alpine

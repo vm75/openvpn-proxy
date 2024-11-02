@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -15,9 +17,10 @@ const (
 	dataCiphers = "AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305:AES-256-CBC:AES-128-CBC"
 )
 
-var shuttingDown = false
+var reconnect = true
 var openVpnCmd *exec.Cmd = nil
 var loopRunning = false
+var IpInfo map[string]string = map[string]string{}
 
 func fileExists(filename string) bool {
 	_, err := os.Stat(filename)
@@ -38,7 +41,7 @@ func startOpenVPNLoop() {
 	execPath, _ := os.Executable()
 
 	loopRunning = true
-	for !shuttingDown {
+	for reconnect {
 		settings := GetProxySettings()
 		retryInterval := strconv.Itoa(settings.RetryInterval)
 
@@ -72,16 +75,18 @@ func startOpenVPNLoop() {
 		err := openVpnCmd.Start()
 		if err != nil {
 			log.Println(err)
-			time.Sleep(time.Duration(settings.RetryInterval) * time.Second)
+			sleepFor := max(settings.RetryInterval, 60)
+			time.Sleep(time.Duration(sleepFor) * time.Second)
 		} else {
 			log.Println("OpenVPN started with pid", openVpnCmd.Process.Pid)
 			os.WriteFile(PidFile, []byte(strconv.Itoa(openVpnCmd.Process.Pid)), 0644)
 			status := openVpnCmd.Wait()
+			IpInfo = map[string]string{}
 			os.Remove(PidFile)
 			log.Printf("OpenVPN exited with status: %v\n", status)
 		}
 
-		if shuttingDown {
+		if !reconnect {
 			break
 		}
 	}
@@ -89,18 +94,61 @@ func startOpenVPNLoop() {
 	loopRunning = false
 }
 
-func StartOpenVPNLoop() {
+func StartVPN() {
+	reconnect = true
 	go startOpenVPNLoop()
 }
 
-func StopOpenVPN() {
+func RestartVPN() {
 	if openVpnCmd != nil {
 		log.Printf("Stopping OpenVPN with pid %d\n", openVpnCmd.Process.Pid)
 		openVpnCmd.Process.Signal(syscall.SIGTERM)
 	}
 }
 
-func ShutdownOpenVPN() {
-	shuttingDown = true
-	StopOpenVPN()
+func StopVPN() {
+	reconnect = false
+	RestartVPN()
+}
+
+type VPNStatus struct {
+	Running bool              `json:"running"`
+	IpInfo  map[string]string `json:"ipInfo"`
+}
+
+func getIpInfo() {
+	// https://worldtimeapi.org/api/ip
+	cmd := exec.Command("/usr/bin/wget", "-q", "-O", "-", "https://ipinfo.io/json")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Fprintln(logFile, string(out))
+		IpInfo = map[string]string{}
+		return
+	}
+
+	err = json.Unmarshal(out, &IpInfo)
+	if err != nil {
+		fmt.Fprintln(logFile, err)
+	}
+}
+
+func GetVPNStatus() VPNStatus {
+	running := false
+	if openVpnCmd == nil || openVpnCmd.Process == nil || (openVpnCmd.ProcessState != nil && openVpnCmd.ProcessState.Exited()) {
+		IpInfo = map[string]string{}
+		return VPNStatus{
+			Running: false,
+			IpInfo:  IpInfo,
+		}
+	}
+
+	running = true
+	if len(IpInfo) == 0 {
+		getIpInfo()
+	}
+
+	return VPNStatus{
+		Running: running,
+		IpInfo:  IpInfo,
+	}
 }

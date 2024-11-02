@@ -82,6 +82,29 @@ func saveSettings(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// Get VPN status
+func getVPNStatus(w http.ResponseWriter, r *http.Request) {
+	status := GetVPNStatus()
+	json.NewEncoder(w).Encode(status)
+}
+
+// Stop VPN
+func stopVPN(w http.ResponseWriter, r *http.Request) {
+	StopVPN()
+	w.WriteHeader(http.StatusOK)
+}
+
+// Start VPN
+func startVPN(w http.ResponseWriter, r *http.Request) {
+	StartVPN()
+	w.WriteHeader(http.StatusOK)
+}
+
+func restartVPN(w http.ResponseWriter, r *http.Request) {
+	RestartVPN()
+	w.WriteHeader(http.StatusOK)
+}
+
 // Separate function to handle static files
 func handleStaticFiles(r *mux.Router) {
 	// Serve static files from /static and root (/)
@@ -103,6 +126,12 @@ func WebServer(port string) {
 	// Config-related routes
 	r.HandleFunc("/api/settings", getSettings).Methods("GET")
 	r.HandleFunc("/api/settings/save", saveSettings).Methods("POST")
+
+	// VPN
+	r.HandleFunc("/api/vpn/status", getVPNStatus).Methods("GET")
+	r.HandleFunc("/api/vpn/stop", stopVPN).Methods("POST")
+	r.HandleFunc("/api/vpn/start", startVPN).Methods("POST")
+	r.HandleFunc("/api/vpn/restart", restartVPN).Methods("POST")
 
 	// Serve static files
 	handleStaticFiles(r)

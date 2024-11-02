@@ -99,7 +99,7 @@ func VpnUp() {
 	// Drop all other incoming connections on the VPN interface
 	run("/sbin/iptables", "-A", "INPUT", "-i", dev, "-j", "DROP")
 
-	// Stop apps
+	// Run apps
 	run("/usr/local/bin/vpn-up")
 }
 
@@ -171,20 +171,6 @@ func VpnUpDown() {
 		VpnUp()
 	} else if scriptType == "down" {
 		logFile, _ = os.OpenFile("/data/var/vpn-down.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-
-		// # while : ; do
-		// #     # Configure routes
-		// #     ${SCRIPT_DIR}/setup-routes down
-
-		// #     server=$(grep '^remote ' ${VPN_CONF} | awk '{print $2}')
-		// #     nslookup ${server} &> /dev/null
-		// #     if [ $? -eq 0 ] ; then
-		// #         break
-		// #     fi
-		// #     log "Unable to reach server. Trying again..."
-		// #     sleep 1
-		// # done
-
 		VpnDown()
 	}
 }

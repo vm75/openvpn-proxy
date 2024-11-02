@@ -28,7 +28,7 @@ const template = `
           </div>
           <div class="field">
             <label class="label">Endpoints</label>
-            <div class="control bulma-input">
+            <div class="control vue-bulma-input">
               <table class="table is-fullwidth is-striped">
                 <thead>
                   <tr>
@@ -149,24 +149,18 @@ export default {
   mounted() {
     this.nameIsEditable = !this.server.name;
 
-    // Create a <style> element
-    const style = document.createElement('style');
-
-    // Define the CSS rules as a string
-    style.innerHTML = `
-      .bulma-input {
+    injectStyle('vue-bulma-input-style', `
+      .vue-bulma-input {
           border: 1px solid #dbdbdb;
           border-radius: 5px;
           padding: 0.5rem;
       }
 
-      .bulma-input:focus-within {
+      .vue-bulma-input:focus-within {
           border-color: #3273dc;
           box-shadow: 0 0 0 0.125em rgba(50, 115, 220, 0.25);
           outline: none;
       }`
-
-    // Append the <style> element to the <head> of the document
-    document.head.appendChild(style);
+    );
   }
 }
