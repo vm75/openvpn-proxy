@@ -101,8 +101,8 @@
                           <div class="field control">
                             <basic
                               type="switch"
-                              v-model:value="httpProxy.settings.enabled"
-                              @update:value="toggleModule('httpProxy')">
+                              v-model:value="http_proxy.settings.enabled"
+                              @update:value="toggleModule('http_proxy')">
                             </basic>
                           </div>
                         </div>
@@ -115,8 +115,8 @@
                           <div class="field control">
                             <basic
                               type="switch"
-                              v-model:value="socksProxy.settings.enabled"
-                              @update:value="toggleModule('socksProxy')">
+                              v-model:value="socks_proxy.settings.enabled"
+                              @update:value="toggleModule('socks_proxy')">
                             </basic>
                           </div>
                         </div>
@@ -312,13 +312,13 @@
             },
             servers: [],
           },
-          httpProxy: {
+          http_proxy: {
             status: false,
             settings: {
               enabled: false,
             }
           },
-          socksProxy: {
+          socks_proxy: {
             status: false,
             settings: {
               enabled: false,
@@ -351,22 +351,22 @@
           })
           this.global.modified = false;
 
-          var settings = await fetch('/api/openvpn/settings').then(response => response.json());
+          var openVPNSettings = await fetch('/api/openvpn/settings').then(response => response.json());
           Object.assign(this.openvpn.settings, {
-            enabled: settings.enabled || false,
-            serverName: settings.serverName || '',
-            serverEndpoint: settings.serverEndpoint || '',
-            logLevel: settings.logLevel || 3,
-            retryInterval: settings.retryInterval || 3600,
+            enabled: openVPNSettings.enabled || false,
+            serverName: openVPNSettings.serverName || '',
+            serverEndpoint: openVPNSettings.serverEndpoint || '',
+            logLevel: openVPNSettings.logLevel || 3,
+            retryInterval: openVPNSettings.retryInterval || 3600,
           })
-          // var httpProxySettings = await fetch('/api/http-proxy/settings').then(response => response.json());
-          // this.httpProxySettings = {
-          //   enabled: httpProxySettings.enabled || false,
-          // }
-          // var socksProxySettings = await fetch('/api/socks-proxy/settings').then(response => response.json());
-          // this.socksProxySettings = {
-          //   enabled: socksProxySettings.enabled || false,
-          // }
+          var httpProxySettings = await fetch('/api/http_proxy/settings').then(response => response.json());
+          Object.assign(this.http_proxy.settings, {
+            enabled: httpProxySettings.enabled || false,
+          })
+          var socksProxySettings = await fetch('/api/socks_proxy/settings').then(response => response.json());
+          Object.assign(this.socks_proxy.settings, {
+            enabled: socksProxySettings.enabled || false,
+          })
           this.openvpn.servers = await fetch('/api/openvpn/servers').then(response => response.json());
           this.openvpn.modified = false;
         },
@@ -442,10 +442,14 @@
           }
         },
         refreshInfo: function () {
-          fetch('/api/openvpn/status').then(response => response.json()).then(data => {
-            this.vpnStatus = data;
-            this.ipInfo = data.ipInfo;
-          });
+          try {
+            fetch('/api/openvpn/status').then(response => response.json()).then(data => {
+              this.vpnStatus = data;
+              this.ipInfo = data.ipInfo;
+            });
+          } catch (error) {
+            // console.log(error);
+          }
         }
       },
       computed: {
@@ -466,7 +470,7 @@
         this.refreshInfo();
         setInterval(() => {
           this.refreshInfo();
-        }, 15000);
+        }, 60000);
       }
     }).mount('#app')
   </script>

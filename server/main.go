@@ -5,7 +5,9 @@ import (
 	"openvpn-proxy/core"
 	"openvpn-proxy/execmodes/vpn_action"
 	"openvpn-proxy/execmodes/webserver"
+	"openvpn-proxy/modules/http_proxy"
 	"openvpn-proxy/modules/openvpn"
+	"openvpn-proxy/modules/socks_proxy"
 	"openvpn-proxy/utils"
 	"os"
 	"os/exec"
@@ -48,17 +50,17 @@ func main() {
 
 	// detect if this is an openvpn action
 	scriptType := os.Getenv("script_type")
-	openvpnAction := false
+	appMode := core.WebServer
 	if scriptType != "" && len(args) > 0 && args[0][:3] == "tun" {
-		openvpnAction = true
+		appMode = core.VPNAction
 	}
 
-	err = core.Init(dataDir, !openvpnAction)
+	err = core.Init(dataDir, appMode)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if openvpnAction {
+	if appMode == core.VPNAction {
 		switch scriptType {
 		case "up":
 			vpn_action.VpnUp(nil)
@@ -74,7 +76,9 @@ func main() {
 	vpn_action.VpnDown()
 
 	// Register modules
-	openvpn.InitOpenVPNModule()
+	openvpn.InitModule()
+	http_proxy.InitModule()
+	socks_proxy.InitModule()
 
 	// Launch webserver
 	webserver.WebServer(params["--port"].GetValue())

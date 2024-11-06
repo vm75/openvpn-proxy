@@ -89,7 +89,7 @@ func runOpenVPN() {
 }
 
 func killOpenVPN() {
-	if openvpnCmd != nil {
+	if openvpnCmd != nil && openvpnCmd.Process != nil && !openvpnCmd.ProcessState.Exited() {
 		log.Printf("Stopping OpenVPN with pid %d\n", openvpnCmd.Process.Pid)
 		openvpnCmd.Process.Signal(syscall.SIGTERM)
 		// openvpnCmd.Wait()

@@ -22,7 +22,6 @@ type Module interface {
 	Restart() error
 	GetSettings(params map[string]string) (map[string]interface{}, error)
 	SaveSettings(params map[string]string, settings map[string]interface{}) error
-	SignalReceived()
 }
 
 var modules = make(map[string]Module)

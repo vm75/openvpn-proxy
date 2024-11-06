@@ -30,7 +30,7 @@ var pidFile = ""
 var logFile = ""
 var statusFile = ""
 
-func InitOpenVPNModule() {
+func InitModule() {
 	initDb()
 
 	configFile = filepath.Join(core.VarDir, "vpn.ovpn")
@@ -48,6 +48,8 @@ func InitOpenVPNModule() {
 	}
 
 	core.RegisterModule("openvpn", &openvpnSettings)
+
+	utils.RegisterListener("shutdown", openvpnSettings)
 
 	if openvpnSettings.Enabled {
 		go runOpenVPN()
@@ -152,9 +154,10 @@ func settingsChanged(o *OpenVPNModule, settings map[string]interface{}) bool {
 	return !utils.AreEqual(currentSettings, settings)
 }
 
-// SignalReceived implements core.Module.
-func (o *OpenVPNModule) SignalReceived() {
-	o.Enabled = false
+// HandleEvent implements utils.EventListener.
+func (o OpenVPNModule) HandleEvent(utils.Event) {
+	openvpnSettings.Enabled = false
 	killOpenVPN()
+	openvpnCmd.Wait()
 	os.Exit(0)
 }

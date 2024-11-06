@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"log"
 	"openvpn-proxy/utils"
 	"os"
@@ -12,6 +13,7 @@ import (
 var DataDir string
 var ConfigDir string
 var VarDir string
+var PidFile string
 
 type GlobalSettings struct {
 	VPNTypes      []string `json:"vpnTypes"`
@@ -29,24 +31,65 @@ var globalSettings = GlobalSettings{
 	ProxyPassword: "",
 }
 
-func Init(dataDir string, dbNeeed bool) error {
+// enum for app mode (1 = webserver, 2 = vpn-action)
+type AppMode int
+
+const (
+	WebServer AppMode = iota + 1
+	VPNAction
+)
+
+func SignalRunning(signal syscall.Signal) bool {
+	isRunning := false
+	if _, err := os.Stat(PidFile); err == nil {
+		file, err := os.Open(PidFile)
+		if err != nil {
+			return isRunning
+		}
+		defer file.Close()
+		var pid int
+		_, err = fmt.Fscanf(file, "%d", &pid)
+		if err != nil {
+			return isRunning
+		}
+		proc, err := os.FindProcess(pid)
+		if err == nil {
+			err = proc.Signal(signal)
+			if err != nil {
+				return isRunning
+			}
+			isRunning = true
+		}
+	}
+
+	return isRunning
+}
+
+func Init(dataDir string, appMode AppMode) error {
 	// Set up termination signal handler
 	sigChannel := make(chan os.Signal, 1)
-	signal.Notify(sigChannel, syscall.SIGTERM)
+	signal.Notify(sigChannel, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2)
 	go func() {
-		<-sigChannel
-		log.Println("SIGTERM received, shutting down...")
-
-		for _, module := range GetModules() {
-			module.SignalReceived()
+		for {
+			sig := <-sigChannel
+			switch sig {
+			case syscall.SIGTERM:
+				log.Println("Received SIGTERM")
+				utils.PublishEvent(utils.Event{Name: "shutdown"})
+			case syscall.SIGUSR1:
+				log.Println("Received SIGUSR1")
+				utils.PublishEvent(utils.Event{Name: "vpn-up"})
+			case syscall.SIGUSR2:
+				log.Println("Received SIGUSR2")
+				utils.PublishEvent(utils.Event{Name: "vpn-down"})
+			}
 		}
-
-		os.Exit(0)
 	}()
 
 	DataDir = dataDir
 	ConfigDir = filepath.Join(dataDir, "config")
 	VarDir = filepath.Join(dataDir, "var")
+	PidFile = filepath.Join(VarDir, "openvpn-proxy.pid")
 
 	err := os.MkdirAll(ConfigDir, 0755)
 	if err != nil {
@@ -57,20 +100,32 @@ func Init(dataDir string, dbNeeed bool) error {
 		return err
 	}
 
-	if dbNeeed {
-		err = initDb()
-		if err != nil {
-			return err
-		}
+	if appMode == VPNAction {
+		return nil
+	}
 
-		var savedSettings map[string]interface{}
-		savedSettings, err = GetSettings("global")
-		if err == nil {
-			utils.MapToObject(savedSettings, &globalSettings)
-		} else {
-			utils.ObjectToMap(globalSettings, &savedSettings)
-			SaveSettings("global", savedSettings)
-		}
+	// if pid file exists, and process is still running, return
+	if SignalRunning(syscall.SIGCONT) {
+		os.Exit(0)
+	}
+	err = os.WriteFile(PidFile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
+	if err != nil {
+		return err
+	}
+
+	// appMode == WebServer
+	err = initDb()
+	if err != nil {
+		return err
+	}
+
+	var savedSettings map[string]interface{}
+	savedSettings, err = GetSettings("global")
+	if err == nil {
+		utils.MapToObject(savedSettings, &globalSettings)
+	} else {
+		utils.ObjectToMap(globalSettings, &savedSettings)
+		SaveSettings("global", savedSettings)
 	}
 
 	return nil
