@@ -6,9 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>OpenVPN Proxy</title>
   <link rel="icon" href="data:;base64,=">
-  <link rel="stylesheet" href="https://unpkg.com/bulma@latest/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@creativebulma/bulma-divider/dist/bulma-divider.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
-  <script src="https://unpkg.com/vue@latest/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.global.min.js"></script>
   <script src="./utils/component-load.js"></script>
   <style>
     .tooltip {
@@ -74,130 +75,207 @@
 
             <!-- OpenVPN Proxy Settings -->
             <div v-if="currentTab === 'settings'">
-              <div class="columns is-flex">
+              <div class="columns">
                 <div class="container column">
                   <div class="container box" style="height: 100%;">
-                    <div class="level">
-                      <div class="level-left">
-                        <h3 class="title is-4">VPN Server Info</h3>
-                      </div>
-                      <div class="level-right">
-                    <div class="buttons">
-                      <div class="tooltip">
-                        <button v-if="!vpnStatus.running" class="button is-small is-success" @click="vpnCommand('start')">
-                          <span class="icon">
-                            <i class="fas fa-play"></i>
-                          </span>
-                        </button>
-                        <span class="tooltip-text">Start OpenVPN Server</span>
-                      </div>
-                      <div class="tooltip">
-                        <button v-if="vpnStatus.running" class="button is-small is-warning" @click="vpnCommand('stop')">
-                          <span class="icon">
-                            <i class="fas fa-stop"></i>
-                          </span>
-                        </button>
-                        <span class="tooltip-text">Stop OpenVPN Server</span>
-                      </div>
-                      <div class="tooltip">
-                        <button v-if="vpnStatus.running" class="button is-small is-info" @click="vpnCommand('restart')">
-                          <span class="icon">
-                            <i class="fas fa-redo"></i>
-                          </span>
-                        </button>
-                        <span class="tooltip-text">Restart OpenVPN Server</span>
-                      </div>
-                      <div class="tooltip">
-                        <button v-if="vpnStatus.running" class="button is-small is-light" @click="refreshInfo">
-                          <span class="icon">
-                            <i class="fas fa-sync-alt"></i>
-                          </span>
-                        </button>
-                        <span class="tooltip-text">Refresh Status</span>
-                      </div>
-                    </div>
-                      </div>
-                    </div>
-                    <div v-if="vpnStatus.running">
-                      <div class="container">
-                        <div class="columns">
-                          <div class="column is-3 has-text-weight-bold">IP Address:</div>
-                          <div class="column" id="ip">{{ vpnStatus.ipInfo.ip }}</div>
+                    <form>
+                      <div class="field is-horizontal">
+                        <div class="field-label is-normal">
+                          <label class="label">VPN</label>
                         </div>
-
-                        <div class="columns">
-                          <div class="column is-3 has-text-weight-bold">Organization:</div>
-                          <div class="column" id="org">{{ vpnStatus.ipInfo.org }}</div>
-                        </div>
-
-                        <div class="columns">
-                          <div class="column is-3 has-text-weight-bold">Location:</div>
-                          <div class="column" id="location">{{ vpnStatus.ipInfo.city }}, {{ vpnStatus.ipInfo.country }}</div>
-                        </div>
-
-                        <div class="columns">
-                          <div class="column is-3 has-text-weight-bold">Timezone:</div>
-                          <div class="column" id="timezone">{{ vpnStatus.ipInfo.timezone }}</div>
+                        <div class="field-body">
+                          <div class="field control">
+                            <basic
+                              type="switch"
+                              v-model:value="openvpn.settings.enabled"
+                              @update:value="toggleModule('vpn')">
+                            </basic>
+                          </div>
                         </div>
                       </div>
-                      <!-- Map Display -->
-                      <location-map class="mt-4"
-                        v-model:latitude="vpnStatus.ipInfo.loc.split(',')[0]"
-                        v-model:longitude="vpnStatus.ipInfo.loc.split(',')[1]"
-                        v-model:city="vpnStatus.ipInfo.city">
-                      </location-map>
+                      <div class="field is-horizontal">
+                        <div class="field-label is-normal">
+                          <label class="label">Http Proxy</label>
+                        </div>
+                        <div class="field-body">
+                          <div class="field control">
+                            <basic
+                              type="switch"
+                              v-model:value="httpProxy.settings.enabled"
+                              @update:value="toggleModule('httpProxy')">
+                            </basic>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="field is-horizontal">
+                        <div class="field-label is-normal">
+                          <label class="label">Socks Proxy</label>
+                        </div>
+                        <div class="field-body">
+                          <div class="field control">
+                            <basic
+                              type="switch"
+                              v-model:value="socksProxy.settings.enabled"
+                              @update:value="toggleModule('socksProxy')">
+                            </basic>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <div class="divider">Common Settings</div>
+                      </div>
+                      <div class="field is-horizontal">
+                        <div class="field-label is-normal">
+                          <label class="label">LAN Subnets</label>
+                        </div>
+                        <div class="field-body">
+                          <div class="field control is-fullwidth">
+                            <inline-list
+                              :name="'Subnet'"
+                              v-model:entries="global.settings.subnets"
+                              type="subnet"
+                              @update:entries="setModified('global')">
+                            </inline-list>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="field is-horizontal">
+                        <div class="field-label is-normal">
+                          <label class="label">VPN Type</label>
+                        </div>
+                        <div class="field-body">
+                          <div class="field">
+                            <div class="control select is-fullwidth">
+                              <select v-model="global.settings.vpnType" @change="setModified('global')">
+                                <option v-for="vpnType in global.settings.vpnTypes"
+                                  :key="vpnType"
+                                  :value="vpnType"
+                                  :selected="vpnType === 'openvpn'">
+                                    {{ vpnType }}
+                                </option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div v-if="global.settings.vpnType === 'openvpn'">
+                        <div>
+                          <div class="divider">VPN Settings</div>
+                        </div>
+                        <div class="field is-horizontal">
+                          <div class="field-label is-normal">
+                            <label class="label">OpenVPN Provider</label>
+                          </div>
+                          <div class="field-body">
+                            <div class="field">
+                              <div class="control select is-fullwidth">
+                                <select v-model="openvpn.settings.serverName" @change="setModified('openvpn')">
+                                  <option v-for="server in openvpn.servers"
+                                    :key="server.name"
+                                    :value="server.name"
+                                    :selected="server.name === openvpn.settings.serverName">
+                                      {{ server.name }}
+                                  </option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="field is-horizontal">
+                          <div class="field-label is-normal">
+                            <label class="label">Server Endpoint</label>
+                          </div>
+                          <div class="field-body">
+                            <div class="field control select is-fullwidth">
+                              <select v-model="openvpn.settings.serverEndpoint" @change="setModified('openvpn')">
+                                <option v-for="endpoint in endpoints"
+                                  :key="endpoint.name"
+                                  :value="endpoint.name"
+                                  :selected="endpoint.name === openvpn.settings.serverEndpoint">
+                                  {{ endpoint.name }}
+                                </option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </form>
+                    <div class="mt-4 buttons">
+                      <button class="button is-success mx-auto" @click="saveSettings" :disabled="!isModified">Save</button>
                     </div>
                   </div>
                 </div>
                 <div class="container column">
                   <div class="container box" style="height: 100%;">
-                    <form>
-                      <div class="field">
-                        <label class="label">OpenVPN Provider</label>
-                        <div class="control select is-fullwidth">
-                          <select v-model="proxySettings.serverName">
-                            <option v-for="server in servers"
-                              :key="server.name"
-                              :value="server.name"
-                              :selected="server.name === proxySettings.serverName">{{ server.name }}
-                            </option>
-                          </select>
+                    <div class="level">
+                      <div class="level-left">
+                        <h3 class="title is-4">IP Info</h3>
+                      </div>
+                      <!-- <div class="level-right">
+                        <div class="buttons">
+                          <div class="tooltip">
+                            <button v-if="!openvpn.status" class="button is-small is-success" @click="vpnCommand('start')">
+                              <span class="icon">
+                                <i class="fas fa-play"></i>
+                              </span>
+                            </button>
+                            <span class="tooltip-text">Start OpenVPN Server</span>
+                          </div>
+                          <div class="tooltip">
+                            <button v-if="openvpn.status" class="button is-small is-warning" @click="vpnCommand('stop')">
+                              <span class="icon">
+                                <i class="fas fa-stop"></i>
+                              </span>
+                            </button>
+                            <span class="tooltip-text">Stop OpenVPN Server</span>
+                          </div>
+                          <div class="tooltip">
+                            <button v-if="openvpn.status" class="button is-small is-info" @click="vpnCommand('restart')">
+                              <span class="icon">
+                                <i class="fas fa-redo"></i>
+                              </span>
+                            </button>
+                            <span class="tooltip-text">Restart OpenVPN Server</span>
+                          </div>
+                          <div class="tooltip">
+                            <button v-if="openvpn.status" class="button is-small is-light" @click="refreshInfo">
+                              <span class="icon">
+                                <i class="fas fa-sync-alt"></i>
+                              </span>
+                            </button>
+                            <span class="tooltip-text">Refresh Status</span>
+                          </div>
+                        </div>
+                      </div> -->
+                    </div>
+                    <div v-if="ipInfo">
+                      <div class="container">
+                        <div class="columns">
+                          <div class="column is-3 has-text-weight-bold">IP Address:</div>
+                          <div class="column" id="ip">{{ ipInfo.ip }}</div>
+                        </div>
+
+                        <div class="columns">
+                          <div class="column is-3 has-text-weight-bold">Organization:</div>
+                          <div class="column" id="org">{{ ipInfo.org }}</div>
+                        </div>
+
+                        <div class="columns">
+                          <div class="column is-3 has-text-weight-bold">Location:</div>
+                          <div class="column" id="location">{{ ipInfo.city }}, {{ ipInfo.country }}</div>
+                        </div>
+
+                        <div class="columns">
+                          <div class="column is-3 has-text-weight-bold">Timezone:</div>
+                          <div class="column" id="timezone">{{ ipInfo.timezone }}</div>
                         </div>
                       </div>
-                      <div class="field">
-                        <label class="label">Server Endpoint</label>
-                        <div class="control select is-fullwidth">
-                          <select v-model="proxySettings.serverEndpoint">
-                            <option v-for="endpoint in endpoints"
-                              :key="endpoint.name"
-                              :value="endpoint.name"
-                              :selected="endpoint.name === proxySettings.serverEndpoint">{{ endpoint.name }}
-                            </option>
-                          </select>
-                        </div>
-                      </div>
-                      <div class="field">
-                        <label class="label">Http Proxy</label>
-                        <div class="control is-fullwidth">
-                          <basic type="on-off" v-model:value="proxySettings.httpProxy"></basic>
-                        </div>
-                      </div>
-                      <div class="field">
-                        <label class="label">Socks Proxy</label>
-                        <div class="control">
-                          <basic type="on-off" v-model:value="proxySettings.socksProxy"></basic>
-                        </div>
-                      </div>
-                      <div class="field">
-                        <label class="label">LAN Subnets</label>
-                        <div class="control">
-                          <inline-list :name="'Subnet'" v-model:entries="proxySettings.subnets" type="subnet">
-                          </inline-list>
-                        </div>
-                      </div>
-                    </form>
-                    <div class="mt-4 buttons">
-                      <button class="button is-success mx-auto" @click="saveProxySettings">Save</button>
+                      <!-- Map Display -->
+                      <location-map class="mt-4"
+                        v-model:latitude="ipInfo.loc.split(',')[0]"
+                        v-model:longitude="ipInfo.loc.split(',')[1]"
+                        v-model:city="ipInfo.city">
+                      </location-map>
                     </div>
                   </div>
                 </div>
@@ -208,7 +286,7 @@
             <div v-if="currentTab === 'servers'" class="box">
               <list-editor
                 :name="'OpenVPN Servers'"
-                :list="servers"
+                :list="openvpn.servers"
                 :editItem="editServer"
                 :addItem="editServer"
                 :removeItem="deleteServer"
@@ -221,20 +299,41 @@
       data() {
         return {
           currentTab: 'settings',
-          vpnStatus: {
-            "running": false,
-            "ipInfo": {
+          ipInfo: null,
+          openvpn: {
+            status: false,
+            modified: false,
+            settings: {
+              enabled: false,
+              serverName: '',
+              serverEndpoint: '',
+              logLevel: 3,
+              retryInterval: 3600,
+            },
+            servers: [],
+          },
+          httpProxy: {
+            status: false,
+            settings: {
+              enabled: false,
             }
           },
-          proxySettings: {
-            serverName: '',
-            serverEndpoint: '',
-            httpProxy: 'on',
-            socksProxy: 'on',
-            killSwitch: 'on',
-            subnets: [],
+          socksProxy: {
+            status: false,
+            settings: {
+              enabled: false,
+            }
           },
-          servers: [],
+          global: {
+            modified: false,
+            settings: {
+              vpnType: 'openvpn',
+              vpnTypes: ['openvpn', 'wireguard'],
+              subnets: [],
+              proxyUsername: '',
+              proxyPassword: '',
+            }
+          }
         }
       },
       components: {
@@ -245,17 +344,31 @@
       },
       methods: {
         async reload() {
-          var settings = await fetch('/api/settings').then(response => response.json());
-          this.proxySettings = {
+          var globalSettings = await fetch('/api/settings').then(response => response.json());
+          Object.assign(this.global.settings, {
+            vpnType: globalSettings.vpnType || 'openvpn',
+            subnets: globalSettings.subnets || [],
+          })
+          this.global.modified = false;
+
+          var settings = await fetch('/api/openvpn/settings').then(response => response.json());
+          Object.assign(this.openvpn.settings, {
+            enabled: settings.enabled || false,
             serverName: settings.serverName || '',
             serverEndpoint: settings.serverEndpoint || '',
-            httpProxy: settings.httpProxy || 'on',
-            socksProxy: settings.socksProxy || 'on',
-            subnets: settings.subnets || [],
-            killSwitch: settings.killSwitch || 'on',
-            vpnLogLevel: settings.vpnLogLevel || 3
-          }
-          this.servers = await fetch('/api/servers').then(response => response.json());
+            logLevel: settings.logLevel || 3,
+            retryInterval: settings.retryInterval || 3600,
+          })
+          // var httpProxySettings = await fetch('/api/http-proxy/settings').then(response => response.json());
+          // this.httpProxySettings = {
+          //   enabled: httpProxySettings.enabled || false,
+          // }
+          // var socksProxySettings = await fetch('/api/socks-proxy/settings').then(response => response.json());
+          // this.socksProxySettings = {
+          //   enabled: socksProxySettings.enabled || false,
+          // }
+          this.openvpn.servers = await fetch('/api/openvpn/servers').then(response => response.json());
+          this.openvpn.modified = false;
         },
         editServer: function (index) {
           injectComponent({
@@ -263,12 +376,12 @@
             name: 'edit-server',
             source: './config/edit-server.js',
             data: {
-              server: index !== undefined ? this.servers[index] : {},
+              server: index !== undefined ? this.openvpn.servers[index] : {},
               showOnLoad: true
             },
             methods: {
               save: (data) => {
-                fetch('/api/servers/save', {
+                fetch('/api/openvpn/servers/save', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json'
@@ -282,7 +395,7 @@
           });
         },
         deleteServer: function (index) {
-          fetch(`/api/servers/delete/${this.servers[index].name}`, {
+          fetch(`/api/openvpn/servers/delete/${this.openvpn.servers[index].name}`, {
             method: 'DELETE'
           })
             .then(() => this.reload());
@@ -290,35 +403,63 @@
         serversDisplayString: function (server) {
           return server.name;
         },
-        saveProxySettings: function () {
-          fetch(`/api/settings/save`, {
+        vpnCommand: function (cmd) {
+          fetch(`/api/openvpn/${cmd}`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(this.proxySettings)
           });
         },
-        vpnCommand: function (cmd) {
-          fetch(`/api/vpn/${cmd}`, {
+        toggleModule: function (module) {
+          if (module === 'vpn') {
+            module = 'openvpn';
+          }
+          var cmd = this[module].settings.enabled ? 'enable' : 'disable';
+          var now = this[module].settings.enabled ? 'start' : 'stop';
+          fetch(`/api/${module}/${cmd}?${now}=true`, {
             method: 'POST',
           });
+        },
+        setModified: function (what) {
+          this[what].modified = true;
+        },
+        saveSettings: function (module) {
+          if (this.openvpn.modified) {
+            fetch(`/api/openvpn/settings/save`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(this.openvpn.settings)
+            });
+          }
+          if (this.global.modified) {
+            fetch(`/api/settings/save`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(this.global.settings)
+            });
+          }
         },
         refreshInfo: function () {
-          fetch('/api/vpn/status').then(response => response.json()).then(data => {
+          fetch('/api/openvpn/status').then(response => response.json()).then(data => {
             this.vpnStatus = data;
+            this.ipInfo = data.ipInfo;
           });
         }
       },
       computed: {
         endpoints: function () {
-          for (const server of this.servers) {
-            if (server.name === this.proxySettings.serverName) {
+          for (const server of this.openvpn.servers) {
+            if (server.name === this.openvpn.settings.serverName) {
               return server.endpoints;
             }
           }
           return [];
         },
+        isModified: function () {
+          return this.openvpn.modified || this.global.modified;
+        }
       },
       mounted() {
         this.reload();

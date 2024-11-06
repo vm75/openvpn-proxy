@@ -228,7 +228,8 @@ export default {
           return 0;
         case 'float':
           return 0.0;
-        case 'bool':
+        case 'checkbox':
+        case 'switch':
         case 'yes-no':
         case 'on-off':
         case 'true-false':

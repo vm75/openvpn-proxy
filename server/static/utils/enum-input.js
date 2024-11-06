@@ -1,11 +1,4 @@
 export default {
-  name: 'enum',
-  props: ['value', 'options'],
-  data() {
-    return {
-      internalValue: this.value, // Local copy of value for editing
-    };
-  },
   template: `
     <div class="select">
       <select v-model="internalValue" @change="emitInput">
@@ -17,6 +10,13 @@ export default {
       </select>
     </div>
   `,
+  name: 'enum',
+  props: ['value', 'options'],
+  data() {
+    return {
+      internalValue: this.value, // Local copy of value for editing
+    };
+  },
   methods: {
     emitInput() {
       // Emit value back to parent

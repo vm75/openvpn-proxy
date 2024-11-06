@@ -1,18 +1,18 @@
 package main
 
 import (
-	"flag"
 	"log"
+	"openvpn-proxy/core"
+	"openvpn-proxy/execmodes/vpn_action"
+	"openvpn-proxy/execmodes/webserver"
+	"openvpn-proxy/modules/openvpn"
+	"openvpn-proxy/utils"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
-	"syscall"
-
-	"openvpn-proxy/daemon"
 )
 
-func globalInit(dataDir string) {
+func oneTimeSetup(dataDir string) {
 	markerFile := "/.initialized"
 	appScript := filepath.Join(dataDir, "apps.sh")
 
@@ -34,16 +34,6 @@ func globalInit(dataDir string) {
 }
 
 func main() {
-	// Set up termination signal handler
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM)
-	go func() {
-		<-sigChan
-		log.Println("SIGTERM received, shutting down...")
-		daemon.StopVPN()
-		os.Exit(0)
-	}()
-
 	ex, err := os.Executable()
 	if err != nil {
 		log.Fatal(err)
@@ -53,24 +43,39 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Command-line flag for port
-	port := flag.String("port", "80", "Port to run the server on")
-	dataDir := flag.String("data", "/data", "Directory to store data")
-	daemon.StaticDir = flag.String("static", "./static", "Directory of static files")
-	flag.Parse()
+	params, args := utils.SmartArgs("--data|-d=/data:,--port|-p=80:", os.Args[1:])
+	dataDir := params["--data"].GetValue()
 
-	args := flag.Args()
-	if len(args) > 0 {
-		// if args 0 starts with tun
-		if args[0][:3] == "tun" {
-			daemon.VpnUpDown()
-			os.Exit(0)
-		}
+	// detect if this is an openvpn action
+	scriptType := os.Getenv("script_type")
+	openvpnAction := false
+	if scriptType != "" && len(args) > 0 && args[0][:3] == "tun" {
+		openvpnAction = true
 	}
 
-	globalInit(*dataDir)
+	err = core.Init(dataDir, !openvpnAction)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	daemon.Init(*dataDir)
-	daemon.StartVPN()
-	daemon.WebServer(*port)
+	if openvpnAction {
+		switch scriptType {
+		case "up":
+			vpn_action.VpnUp(nil)
+		case "down":
+			vpn_action.VpnDown()
+		}
+		os.Exit(0)
+	}
+
+	oneTimeSetup(dataDir)
+
+	// Disable all connectivity
+	vpn_action.VpnDown()
+
+	// Register modules
+	openvpn.InitOpenVPNModule()
+
+	// Launch webserver
+	webserver.WebServer(params["--port"].GetValue())
 }

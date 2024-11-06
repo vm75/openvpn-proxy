@@ -1,4 +1,10 @@
 export default {
+  template: `
+    <div>
+      <!-- Map Container -->
+      <div id="vue-map" ref="map" style="height: 200px; border-radius: 5px;"></div>
+    </div>
+  `,
   name: 'location-map',
   props: {
     latitude: {
@@ -19,12 +25,6 @@ export default {
       map: null
     }
   },
-  template: `
-    <div>
-      <!-- Map Container -->
-      <div id="vue-map" ref="map" style="height: 200px; border-radius: 5px;"></div>
-    </div>
-  `,
   methods: {
     initMap() {
       if (this.map) {
@@ -42,8 +42,7 @@ export default {
 
       // Add marker to map with popup
       L.marker([this.latitude, this.longitude]).addTo(this.map)
-        .bindPopup(`VPN Server Location: ${this.city}`)
-        .openPopup();
+        .bindPopup(`VPN Server Location: ${this.city}`);
     },
   },
   watch: {
@@ -58,8 +57,8 @@ export default {
     }
   },
   mounted() {
-    const leafletCssUrl = 'https://unpkg.com/leaflet@latest/dist/leaflet.css';
-    const leafletJsUrl = 'https://unpkg.com/leaflet@latest/dist/leaflet.js';
+    const leafletCssUrl = 'https://cdn.jsdelivr.net/npm/leaflet@latest/dist/leaflet.min.css';
+    const leafletJsUrl = 'https://cdn.jsdelivr.net/npm/leaflet@latest/dist/leaflet.min.js';
 
     if (!isLoaded(leafletCssUrl)) {
       injectStyleUrl(leafletCssUrl);

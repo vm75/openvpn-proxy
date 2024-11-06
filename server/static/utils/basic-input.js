@@ -1,11 +1,15 @@
-const bool = {
-  name: 'bool',
-  props: ['value'],
+const toggle = {
   template: `
     <div>
-      <input type="checkbox" v-model="internalValue" @change="emitInput"/>
+      <input v-if="type === 'checkbox'" type="checkbox" v-model="internalValue" @change="emitInput"/>
+      <label v-if="type === 'switch'" class="switch">
+        <input type="checkbox" v-model="internalValue" @change="emitInput"/>
+        <span class="slider round"></span>
+      </label>
     </div>
   `,
+  name: 'toggle',
+  props: ['type', 'value'],
   data() {
     return {
       internalValue: this.value, // Local copy of value for editing
@@ -16,10 +20,30 @@ const bool = {
       // Emit value back to parent
       this.$emit('update:value', this.internalValue);
     }
+  },
+  watch: {
+    value(newValue) {
+      this.internalValue = newValue; // Sync with parent when prop changes
+    }
+  },
+  mounted() {
+    const switchCssUrl = './utils/switch.css';
+
+    if (this.type === 'switch' && !isLoaded(switchCssUrl)) {
+      injectStyleUrl(switchCssUrl);
+    }
   }
 }
 
 const binary = {
+  template: `
+    <div class="select is-fullwidth">
+      <select v-model="internalValue" @change="emitInput">
+        <option :value="true">{{ trueStr }}</option>
+        <option :value="false">{{ falseStr }}</option>
+      </select>
+    </div>
+  `,
   name: 'binary',
   props: ['type', 'value'], // type can be yes-no, on-off, true-false
   data() {
@@ -29,14 +53,6 @@ const binary = {
       falseStr: 'false',
     };
   },
-  template: `
-    <div class="select is-fullwidth">
-      <select v-model="internalValue" @change="emitInput">
-        <option :value="true">{{ trueStr }}</option>
-        <option :value="false">{{ falseStr }}</option>
-      </select>
-    </div>
-  `,
   methods: {
     emitInput() {
       // Emit value back to parent
@@ -85,6 +101,7 @@ const binary = {
     }
   }
 };
+
 const template = `
   <div>
     <input v-if="type === 'string'" class="input"
@@ -110,10 +127,16 @@ const template = `
       type="number"
       step="any"
       @input="emitInput">
-    <bool v-if="type === 'bool'"
+    <toggle v-if="type === 'checkbox'"
+      :type="'checkbox'"
       v-model:value="internalValue"
       @change="emitInput">
-    </bool>
+    </toggle>
+    <toggle v-if="type === 'switch'"
+      :type="'switch'"
+      v-model:value="internalValue"
+      @change="emitInput">
+    </toggle>
     <binary v-if="type === 'yes-no'"
       :type="'yes-no'"
       v-model:value="internalValue"
@@ -141,8 +164,9 @@ export default {
   name: "basic-input",
   props: ["type", "value", "placeholder", "options"],
   components: {
-    'bool': bool,
+    'toggle': toggle,
     'binary': binary,
+    'toggle': toggle
   },
   data() {
     return {
