@@ -1,4 +1,4 @@
-package vpn_action
+package actions
 
 import (
 	"openvpn-proxy/core"
@@ -63,6 +63,6 @@ func VpnDown() {
 	// Drop all other incoming connections
 	utils.RunCommand("/sbin/iptables", "-A", "INPUT", "-j", "DROP")
 
-	// Stop apps
-	utils.RunCommand("/usr/local/bin/vpn-down")
+	// Trigger vpn down actions
+	utils.RunCommand(core.AppScript, "down")
 }

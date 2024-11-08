@@ -12,6 +12,7 @@ var DataDir string
 var ConfigDir string
 var VarDir string
 var PidFile string
+var AppScript string
 
 type GlobalSettings struct {
 	VPNTypes      []string `json:"vpnTypes"`
@@ -48,6 +49,7 @@ func Init(dataDir string, appMode AppMode) error {
 
 	DataDir = dataDir
 	ConfigDir = filepath.Join(dataDir, "config")
+	AppScript = filepath.Join(dataDir, "apps.sh")
 	VarDir = filepath.Join(dataDir, "var")
 	PidFile = filepath.Join(VarDir, "openvpn-proxy.pid")
 
