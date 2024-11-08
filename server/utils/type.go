@@ -32,3 +32,9 @@ func MapToObject(obj map[string]interface{}, out interface{}) error {
 func AreEqual(obj1, obj2 interface{}) bool {
 	return reflect.DeepEqual(obj1, obj2)
 }
+
+func HasChanged(obj interface{}, settings map[string]interface{}) bool {
+	var currentSettings map[string]interface{}
+	ObjectToMap(obj, &currentSettings)
+	return !AreEqual(currentSettings, settings)
+}

@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -57,4 +58,22 @@ func GetIpInfo(ipInfo map[string]interface{}) error {
 	}
 
 	return nil
+}
+
+func GetIpV4Addr(dev string, stripMask bool) string {
+	cmd := exec.Command("/sbin/ip", "a", "s", dev)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	// regex for ip address
+	regex, _ := regexp.Compile(`([0-9]{1,3}(\.[0-9]{1,3}){3})\/[0-9]{1,2}`)
+
+	// use regex to get ip address
+	addr := regex.FindString(string(out))
+
+	if stripMask {
+		addr = strings.Split(addr, "/")[0]
+	}
+	return addr
 }

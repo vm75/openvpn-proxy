@@ -2,10 +2,8 @@ package core
 
 import (
 	"fmt"
-	"log"
 	"openvpn-proxy/utils"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"syscall"
 )
@@ -23,7 +21,7 @@ type GlobalSettings struct {
 	ProxyPassword string   `json:"proxyPassword"`
 }
 
-var globalSettings = GlobalSettings{
+var GlobalConfig = GlobalSettings{
 	VPNTypes:      []string{"openvpn", "wireguard"},
 	VPNType:       "openvpn",
 	Subnets:       []string{},
@@ -36,55 +34,17 @@ type AppMode int
 
 const (
 	WebServer AppMode = iota + 1
-	VPNAction
+	OpenVPNAction
 )
 
-func SignalRunning(signal syscall.Signal) bool {
-	isRunning := false
-	if _, err := os.Stat(PidFile); err == nil {
-		file, err := os.Open(PidFile)
-		if err != nil {
-			return isRunning
-		}
-		defer file.Close()
-		var pid int
-		_, err = fmt.Fscanf(file, "%d", &pid)
-		if err != nil {
-			return isRunning
-		}
-		proc, err := os.FindProcess(pid)
-		if err == nil {
-			err = proc.Signal(signal)
-			if err != nil {
-				return isRunning
-			}
-			isRunning = true
-		}
-	}
-
-	return isRunning
-}
+var (
+	SHUTDOWN = syscall.SIGTERM
+	VPN_UP   = utils.RealTimeSignal(1)
+	VPN_DOWN = utils.RealTimeSignal(2)
+)
 
 func Init(dataDir string, appMode AppMode) error {
-	// Set up termination signal handler
-	sigChannel := make(chan os.Signal, 1)
-	signal.Notify(sigChannel, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2)
-	go func() {
-		for {
-			sig := <-sigChannel
-			switch sig {
-			case syscall.SIGTERM:
-				log.Println("Received SIGTERM")
-				utils.PublishEvent(utils.Event{Name: "shutdown"})
-			case syscall.SIGUSR1:
-				log.Println("Received SIGUSR1")
-				utils.PublishEvent(utils.Event{Name: "vpn-up"})
-			case syscall.SIGUSR2:
-				log.Println("Received SIGUSR2")
-				utils.PublishEvent(utils.Event{Name: "vpn-down"})
-			}
-		}
-	}()
+	utils.InitSignals([]os.Signal{SHUTDOWN, VPN_UP, VPN_DOWN})
 
 	DataDir = dataDir
 	ConfigDir = filepath.Join(dataDir, "config")
@@ -100,12 +60,12 @@ func Init(dataDir string, appMode AppMode) error {
 		return err
 	}
 
-	if appMode == VPNAction {
+	if appMode == OpenVPNAction {
 		return nil
 	}
 
 	// if pid file exists, and process is still running, return
-	if SignalRunning(syscall.SIGCONT) {
+	if utils.SignalRunning(PidFile, syscall.SIGCONT) {
 		os.Exit(0)
 	}
 	err = os.WriteFile(PidFile, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
@@ -122,9 +82,9 @@ func Init(dataDir string, appMode AppMode) error {
 	var savedSettings map[string]interface{}
 	savedSettings, err = GetSettings("global")
 	if err == nil {
-		utils.MapToObject(savedSettings, &globalSettings)
+		utils.MapToObject(savedSettings, &GlobalConfig)
 	} else {
-		utils.ObjectToMap(globalSettings, &savedSettings)
+		utils.ObjectToMap(GlobalConfig, &savedSettings)
 		SaveSettings("global", savedSettings)
 	}
 
@@ -133,11 +93,21 @@ func Init(dataDir string, appMode AppMode) error {
 
 func GetGlobalSettings() (map[string]interface{}, error) {
 	var settings map[string]interface{}
-	utils.ObjectToMap(globalSettings, &settings)
+	utils.ObjectToMap(GlobalConfig, &settings)
 	return settings, nil
 }
 
 func SaveGlobalSettings(settings map[string]interface{}) error {
-	utils.MapToObject(settings, &globalSettings)
-	return SaveSettings("global", settings)
+	if !utils.HasChanged(&GlobalConfig, settings) {
+		return nil
+	}
+	utils.MapToObject(settings, &GlobalConfig)
+	err := SaveSettings("global", settings)
+	if err != nil {
+		return err
+	}
+
+	utils.PublishEvent(utils.Event{Name: "global-settings-changed", Context: settings})
+
+	return nil
 }

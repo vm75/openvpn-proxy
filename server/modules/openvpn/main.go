@@ -49,7 +49,12 @@ func InitModule() {
 
 	core.RegisterModule("openvpn", &openvpnSettings)
 
-	utils.RegisterListener("shutdown", openvpnSettings)
+	utils.AddSignalHandler([]os.Signal{core.SHUTDOWN}, func(_ os.Signal) {
+		openvpnSettings.Enabled = false
+		killOpenVPN()
+		openvpnCmd.Wait()
+		os.Exit(0)
+	})
 
 	if openvpnSettings.Enabled {
 		go runOpenVPN()
@@ -67,10 +72,10 @@ func (o *OpenVPNModule) RegisterRoutes(r *mux.Router) {
 
 // GetStatus implements core.Module.
 func (o *OpenVPNModule) GetStatus() (core.ModuleStatus, error) {
-	if openvpnCmd == nil || openvpnCmd.Process == nil || (openvpnCmd.ProcessState != nil && openvpnCmd.ProcessState.Exited()) {
-		return core.ModuleStatus{Running: false}, nil
+	if utils.IsRunning(openvpnCmd) {
+		return core.ModuleStatus{Running: true}, nil
 	}
-	return core.ModuleStatus{Running: true}, nil
+	return core.ModuleStatus{Running: false}, nil
 }
 
 // Enable implements core.Module.
@@ -132,7 +137,7 @@ func (o *OpenVPNModule) GetSettings(params map[string]string) (map[string]interf
 
 // SaveSettings implements core.Module.
 func (o *OpenVPNModule) SaveSettings(params map[string]string, settings map[string]interface{}) error {
-	if !settingsChanged(o, settings) {
+	if !utils.HasChanged(o, settings) {
 		return nil
 	}
 	utils.MapToObject(settings, o)
@@ -146,18 +151,4 @@ func (o *OpenVPNModule) SaveSettings(params map[string]string, settings map[stri
 	go runOpenVPN()
 
 	return nil
-}
-
-func settingsChanged(o *OpenVPNModule, settings map[string]interface{}) bool {
-	var currentSettings map[string]interface{}
-	utils.ObjectToMap(o, &currentSettings)
-	return !utils.AreEqual(currentSettings, settings)
-}
-
-// HandleEvent implements utils.EventListener.
-func (o OpenVPNModule) HandleEvent(utils.Event) {
-	openvpnSettings.Enabled = false
-	killOpenVPN()
-	openvpnCmd.Wait()
-	os.Exit(0)
 }

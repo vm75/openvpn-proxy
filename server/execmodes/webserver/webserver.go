@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"openvpn-proxy/core"
 	"openvpn-proxy/utils"
+	"os"
 
 	"github.com/gorilla/mux"
 )
@@ -15,10 +16,6 @@ type IpInfo map[string]interface{}
 
 var staticDir = "./static"
 var ipInfo = IpInfo{}
-
-func (o IpInfo) HandleEvent(event utils.Event) {
-	utils.GetIpInfo(ipInfo)
-}
 
 func queryParams(r *http.Request) map[string]string {
 	params := make(map[string]string)
@@ -175,8 +172,9 @@ func handleStaticFiles(r *mux.Router) {
 }
 
 func WebServer(port string) {
-	utils.RegisterListener("vpn-up", ipInfo)
-	utils.RegisterListener("vpn-down", ipInfo)
+	utils.AddSignalHandler([]os.Signal{core.VPN_UP, core.VPN_DOWN}, func(_ os.Signal) {
+		go utils.GetIpInfo(ipInfo)
+	})
 
 	go utils.GetIpInfo(ipInfo)
 

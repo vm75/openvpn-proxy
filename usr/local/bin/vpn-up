@@ -99,10 +99,10 @@ function main() {
     loadSavedVars
 
     # Start http proxy
-    runTinyProxy&
+    # runTinyProxy&
 
     # Start socks proxy
-    runSockd&
+    # runSockd&
 
     # User apps
     if [ -f /data/apps.sh ] ; then

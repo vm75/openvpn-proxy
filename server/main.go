@@ -52,7 +52,7 @@ func main() {
 	scriptType := os.Getenv("script_type")
 	appMode := core.WebServer
 	if scriptType != "" && len(args) > 0 && args[0][:3] == "tun" {
-		appMode = core.VPNAction
+		appMode = core.OpenVPNAction
 	}
 
 	err = core.Init(dataDir, appMode)
@@ -60,15 +60,24 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if appMode == core.VPNAction {
+	if appMode == core.OpenVPNAction {
 		switch scriptType {
 		case "up":
-			vpn_action.VpnUp(nil)
+			utils.SignalRunning(core.PidFile, core.VPN_UP)
 		case "down":
-			vpn_action.VpnDown()
+			utils.SignalRunning(core.PidFile, core.VPN_DOWN)
 		}
 		os.Exit(0)
 	}
+
+	utils.AddSignalHandler([]os.Signal{core.VPN_UP, core.VPN_DOWN}, func(sig os.Signal) {
+		switch sig {
+		case core.VPN_UP:
+			vpn_action.VpnUp(nil)
+		case core.VPN_DOWN:
+			vpn_action.VpnDown()
+		}
+	})
 
 	oneTimeSetup(dataDir)
 

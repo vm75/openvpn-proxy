@@ -1,112 +1,58 @@
 package socks_proxy
 
 import (
-	"log"
 	"openvpn-proxy/core"
 	"openvpn-proxy/utils"
-
-	"github.com/gorilla/mux"
+	"path/filepath"
 )
 
-const moduleName = "socks_proxy"
-
-type SocksProxyModule struct {
-	Enabled bool `json:"enabled"`
+type HttpProxyModule struct {
+	core.DefaultModule
 }
 
-var proxySettings = SocksProxyModule{
-	Enabled: false,
-}
+var pidFile = ""
+var configFile = ""
 
 func InitModule() {
-	core.RegisterModule(moduleName, &proxySettings)
-
-	savedSettings, err := core.GetSettings(moduleName)
-	if err == nil {
-		utils.MapToObject(savedSettings, &proxySettings)
-	} else {
-		utils.ObjectToMap(proxySettings, &savedSettings)
-		core.SaveSettings(moduleName, savedSettings)
+	var module = HttpProxyModule{
+		DefaultModule: core.DefaultModule{
+			Name: "socks_proxy",
+		},
 	}
-}
 
-// RegisterRoutes implements core.Module.
-func (s *SocksProxyModule) RegisterRoutes(r *mux.Router) {
+	core.RegisterModule(module.Name, &module)
+	utils.RegisterListener("global-settings-changed", &module)
+	utils.RegisterListener("vpn-up", &module)
+	utils.RegisterListener("vpn-down", &module)
+
+	configFile = filepath.Join(core.VarDir, "sockd.conf")
+	pidFile = filepath.Join(core.VarDir, "sockd.pid")
+
+	var err error
+	module.Settings, err = core.GetSettings(module.Name)
+	if err != nil {
+		module.Settings["enabled"] = false
+		core.SaveSettings(module.Name, module.Settings)
+	}
+
+	updateConfig()
 }
 
 // GetStatus implements core.Module.
-func (s *SocksProxyModule) GetStatus() (core.ModuleStatus, error) {
-	return core.ModuleStatus{Running: proxySettings.Enabled}, nil
+func (h *HttpProxyModule) GetStatus() (core.ModuleStatus, error) {
+	return core.ModuleStatus{Running: isRunning()}, nil
 }
 
-// Enable implements core.Module.
-func (s *SocksProxyModule) Enable(startNow bool) error {
-	s.Enabled = true
-	settings := map[string]interface{}{}
-	utils.ObjectToMap(s, &settings)
-	core.SaveSettings(moduleName, settings)
-	if startNow {
-		// TODO
+// HandleEvent implements utils.EventListener.
+func (h *HttpProxyModule) HandleEvent(event utils.Event) {
+	switch event.Name {
+	case "global-settings-changed":
+		updateConfig()
+	case "vpn-up":
+		if h.Settings["enabled"].(bool) {
+			go startProxy()
+		}
+	case "vpn-down":
+		stopProxy()
 	}
-	return nil
-}
-
-// Disable implements core.Module.
-func (s *SocksProxyModule) Disable(stopNow bool) error {
-	s.Enabled = false
-	settings := map[string]interface{}{}
-	utils.ObjectToMap(s, &settings)
-	core.SaveSettings(moduleName, settings)
-	if stopNow {
-		// TODO
-	}
-	return nil
-}
-
-// Start implements core.Module.
-func (s *SocksProxyModule) Start() error {
-	log.Println("unimplemented")
-
-	return nil
-}
-
-// Stop implements core.Module.
-func (s *SocksProxyModule) Stop() error {
-	log.Println("unimplemented")
-
-	return nil
-}
-
-// Restart implements core.Module.
-func (s *SocksProxyModule) Restart() error {
-	log.Println("unimplemented")
-
-	return nil
-}
-
-// GetSettings implements core.Module.
-func (s *SocksProxyModule) GetSettings(params map[string]string) (map[string]interface{}, error) {
-	var settings map[string]interface{}
-	utils.ObjectToMap(proxySettings, &settings)
-	return settings, nil
-}
-
-// SaveSettings implements core.Module.
-func (s *SocksProxyModule) SaveSettings(params map[string]string, settings map[string]interface{}) error {
-	if !settingsChanged(s, settings) {
-		return nil
-	}
-	utils.MapToObject(settings, s)
-	err := core.SaveSettings(moduleName, settings)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func settingsChanged(s *SocksProxyModule, settings map[string]interface{}) bool {
-	var currentSettings map[string]interface{}
-	utils.ObjectToMap(s, &currentSettings)
-	return !utils.AreEqual(currentSettings, settings)
 }

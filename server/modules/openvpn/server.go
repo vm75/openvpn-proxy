@@ -3,6 +3,7 @@ package openvpn
 import (
 	"log"
 	"openvpn-proxy/core"
+	"openvpn-proxy/utils"
 	"os"
 	"os/exec"
 	"strconv"
@@ -78,6 +79,8 @@ func runOpenVPN() {
 			status := openvpnCmd.Wait()
 			os.Remove(pidFile)
 			log.Printf("OpenVPN exited with status: %v\n", status)
+			sleepFor := max(openvpnSettings.RetryInterval, 60)
+			time.Sleep(time.Duration(sleepFor) * time.Second)
 		}
 
 		if !openvpnSettings.Enabled {
@@ -89,9 +92,6 @@ func runOpenVPN() {
 }
 
 func killOpenVPN() {
-	if openvpnCmd != nil && openvpnCmd.Process != nil && !openvpnCmd.ProcessState.Exited() {
-		log.Printf("Stopping OpenVPN with pid %d\n", openvpnCmd.Process.Pid)
-		openvpnCmd.Process.Signal(syscall.SIGTERM)
-		// openvpnCmd.Wait()
-	}
+	utils.SignalCmd(openvpnCmd, syscall.SIGTERM)
+	// openvpnCmd.Wait()
 }

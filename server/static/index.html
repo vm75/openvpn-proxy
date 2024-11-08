@@ -445,7 +445,7 @@
           try {
             fetch('/api/openvpn/status').then(response => response.json()).then(data => {
               this.vpnStatus = data;
-              this.ipInfo = data.ipInfo;
+              this.ipInfo = data.info;
             });
           } catch (error) {
             // console.log(error);

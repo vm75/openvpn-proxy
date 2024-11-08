@@ -12,8 +12,8 @@ function main() {
 
     # log "Killing socks proxy"
     # pkill -9 -x sockd
-    log "Killing http proxy"
-    pkill -9 -x tinyproxy
+    # log "Killing http proxy"
+    # pkill -9 -x tinyproxy
 }
 
 main "$@"

@@ -9,7 +9,7 @@ import (
 
 type ModuleStatus struct {
 	Running bool                   `json:"running"`
-	Info    map[string]interface{} `json:"ipInfo"`
+	Info    map[string]interface{} `json:"info"`
 }
 
 type Module interface {
