@@ -2,13 +2,13 @@ package openvpn
 
 import (
 	"log"
-	"openvpn-proxy/core"
-	"openvpn-proxy/utils"
 	"os"
 	"os/exec"
 	"strconv"
 	"syscall"
 	"time"
+	"vpn-sandbox/core"
+	"vpn-sandbox/utils"
 )
 
 const (
@@ -25,7 +25,7 @@ func fileExists(filename string) bool {
 }
 
 func runOpenVPN() {
-	if isRunning || !openvpnSettings.Enabled {
+	if isRunning || !openvpnConfig.Enabled {
 		return
 	}
 
@@ -38,8 +38,8 @@ func runOpenVPN() {
 	execPath, _ := os.Executable()
 
 	isRunning = true
-	for openvpnSettings.Enabled {
-		retryInterval := strconv.Itoa(openvpnSettings.RetryInterval)
+	for openvpnConfig.Enabled {
+		retryInterval := strconv.Itoa(openvpnConfig.RetryInterval)
 
 		log.Println("Starting OpenVPN")
 		openvpnCmd = exec.Command("openvpn",
@@ -48,7 +48,7 @@ func runOpenVPN() {
 			"--config", configFile,
 			"--auth-user-pass", authFile,
 			"--auth-nocache",
-			"--verb", strconv.Itoa(openvpnSettings.LogLevel),
+			"--verb", strconv.Itoa(openvpnConfig.LogLevel),
 			"--log", logFile,
 			"--status", statusFile, retryInterval,
 			"--ping-restart", retryInterval,
@@ -63,6 +63,7 @@ func runOpenVPN() {
 			"--redirect-gateway", "def1",
 			"--remote-cert-tls", "server",
 			"--data-ciphers", dataCiphers,
+			"--writepid", pidFile,
 		)
 
 		openvpnCmd.Stdout = os.Stdout
@@ -71,19 +72,17 @@ func runOpenVPN() {
 		err := openvpnCmd.Start()
 		if err != nil {
 			log.Println(err)
-			sleepFor := max(openvpnSettings.RetryInterval, 60)
+			sleepFor := max(openvpnConfig.RetryInterval, 60)
 			time.Sleep(time.Duration(sleepFor) * time.Second)
 		} else {
 			log.Println("OpenVPN started with pid", openvpnCmd.Process.Pid)
-			os.WriteFile(pidFile, []byte(strconv.Itoa(openvpnCmd.Process.Pid)), 0644)
 			status := openvpnCmd.Wait()
-			os.Remove(pidFile)
 			log.Printf("OpenVPN exited with status: %v\n", status)
-			sleepFor := max(openvpnSettings.RetryInterval, 60)
+			sleepFor := max(openvpnConfig.RetryInterval, 60)
 			time.Sleep(time.Duration(sleepFor) * time.Second)
 		}
 
-		if !openvpnSettings.Enabled {
+		if !openvpnConfig.Enabled {
 			break
 		}
 	}

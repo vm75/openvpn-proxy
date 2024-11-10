@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"openvpn-proxy/core"
-	"openvpn-proxy/utils"
 	"strings"
+	"vpn-sandbox/core"
+	"vpn-sandbox/utils"
 )
 
 type Server struct {
@@ -44,7 +44,7 @@ func initDb() {
 }
 
 func saveOvpnConfig() error {
-	var server = getOpenVPNServer(openvpnSettings.ServerName)
+	var server = getOpenVPNServer(openvpnConfig.ServerName)
 
 	if server == nil {
 		return errors.New("server not found")
@@ -54,7 +54,7 @@ func saveOvpnConfig() error {
 	var endpoint map[string]string = nil
 
 	for _, entry := range server.Endpoints {
-		if entry["name"] == openvpnSettings.ServerEndpoint {
+		if entry["name"] == openvpnConfig.ServerEndpoint {
 			endpoint = entry
 			break
 		}

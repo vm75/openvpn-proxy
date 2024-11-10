@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"openvpn-proxy/core"
-	"openvpn-proxy/utils"
 	"os"
+	"vpn-sandbox/core"
+	"vpn-sandbox/utils"
 
 	"github.com/gorilla/mux"
 )
@@ -28,23 +28,23 @@ func queryParams(r *http.Request) map[string]string {
 	return params
 }
 
-func getGlobalSettings(w http.ResponseWriter, r *http.Request) {
-	settings, err := core.GetGlobalSettings()
+func getGlobalConfig(w http.ResponseWriter, r *http.Request) {
+	config, err := core.GetGlobalConfig()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	json.NewEncoder(w).Encode(settings)
+	json.NewEncoder(w).Encode(config)
 }
 
-func saveGlobalSettings(w http.ResponseWriter, r *http.Request) {
-	var settings map[string]interface{}
-	err := json.NewDecoder(r.Body).Decode(&settings)
+func saveGlobalConfig(w http.ResponseWriter, r *http.Request) {
+	var config map[string]interface{}
+	err := json.NewDecoder(r.Body).Decode(&config)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	err = core.SaveGlobalSettings(settings)
+	err = core.SaveGlobalConfig(config)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -129,32 +129,32 @@ func restartModule(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func getModuleSettings(w http.ResponseWriter, r *http.Request) {
+func getModuleConfig(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	module := vars["module"]
 
 	params := queryParams(r)
-	settings, err := core.GetModuleSettings(module, params)
+	config, err := core.GetModuleConfig(module, params)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	json.NewEncoder(w).Encode(settings)
+	json.NewEncoder(w).Encode(config)
 }
 
 // Save a config (new or existing)
-func saveModuleSettings(w http.ResponseWriter, r *http.Request) {
+func saveModuleConfig(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	module := vars["module"]
 
 	var params = queryParams(r)
-	var settings map[string]interface{}
-	err := json.NewDecoder(r.Body).Decode(&settings)
+	var config map[string]interface{}
+	err := json.NewDecoder(r.Body).Decode(&config)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	err = core.SaveModuleSettings(module, params, settings)
+	err = core.SaveModuleConfig(module, params, config)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -182,8 +182,8 @@ func WebServer(port string) {
 	r := mux.NewRouter()
 
 	// Config-related routes
-	r.HandleFunc("/api/settings", getGlobalSettings).Methods("GET")
-	r.HandleFunc("/api/settings/save", saveGlobalSettings).Methods("POST")
+	r.HandleFunc("/api/config", getGlobalConfig).Methods("GET")
+	r.HandleFunc("/api/config/save", saveGlobalConfig).Methods("POST")
 
 	// Module
 	r.HandleFunc("/api/{module}/status", getModuleStatus).Methods("GET")
@@ -192,8 +192,8 @@ func WebServer(port string) {
 	r.HandleFunc("/api/{module}/start", startModule).Methods("POST")
 	r.HandleFunc("/api/{module}/stop", stopModule).Methods("POST")
 	r.HandleFunc("/api/{module}/restart", restartModule).Methods("POST")
-	r.HandleFunc("/api/{module}/settings", getModuleSettings).Methods("GET")
-	r.HandleFunc("/api/{module}/settings/save", saveModuleSettings).Methods("POST")
+	r.HandleFunc("/api/{module}/config", getModuleConfig).Methods("GET")
+	r.HandleFunc("/api/{module}/config/save", saveModuleConfig).Methods("POST")
 
 	// Custom module routes
 	for _, module := range core.GetModules() {

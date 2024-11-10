@@ -1,9 +1,10 @@
 package socks_proxy
 
 import (
-	"openvpn-proxy/core"
-	"openvpn-proxy/utils"
+	"os"
 	"path/filepath"
+	"vpn-sandbox/core"
+	"vpn-sandbox/utils"
 )
 
 type HttpProxyModule struct {
@@ -20,22 +21,23 @@ func InitModule() {
 		},
 	}
 
+	module.LoadConfig()
+
 	core.RegisterModule(module.Name, &module)
-	utils.RegisterListener("global-settings-changed", &module)
-	utils.RegisterListener("vpn-up", &module)
-	utils.RegisterListener("vpn-down", &module)
+	utils.RegisterListener("global-config-changed", &module)
+	utils.AddSignalHandler([]os.Signal{core.VPN_UP}, func(_ os.Signal) {
+		if module.Config["enabled"].(bool) {
+			go startProxy()
+		}
+	})
+	utils.AddSignalHandler([]os.Signal{core.VPN_DOWN}, func(_ os.Signal) {
+		go stopProxy()
+	})
 
 	configFile = filepath.Join(core.VarDir, "sockd.conf")
 	pidFile = filepath.Join(core.VarDir, "sockd.pid")
 
-	var err error
-	module.Settings, err = core.GetSettings(module.Name)
-	if err != nil {
-		module.Settings["enabled"] = false
-		core.SaveSettings(module.Name, module.Settings)
-	}
-
-	updateConfig()
+	updateRuntimeConfig()
 }
 
 // GetStatus implements core.Module.
@@ -46,13 +48,7 @@ func (h *HttpProxyModule) GetStatus() (core.ModuleStatus, error) {
 // HandleEvent implements utils.EventListener.
 func (h *HttpProxyModule) HandleEvent(event utils.Event) {
 	switch event.Name {
-	case "global-settings-changed":
-		updateConfig()
-	case "vpn-up":
-		if h.Settings["enabled"].(bool) {
-			go startProxy()
-		}
-	case "vpn-down":
-		stopProxy()
+	case "global-config-changed":
+		updateRuntimeConfig()
 	}
 }

@@ -33,8 +33,8 @@ func AreEqual(obj1, obj2 interface{}) bool {
 	return reflect.DeepEqual(obj1, obj2)
 }
 
-func HasChanged(obj interface{}, settings map[string]interface{}) bool {
-	var currentSettings map[string]interface{}
-	ObjectToMap(obj, &currentSettings)
-	return !AreEqual(currentSettings, settings)
+func HasChanged(obj interface{}, config map[string]interface{}) bool {
+	var currentConfig map[string]interface{}
+	ObjectToMap(obj, &currentConfig)
+	return !AreEqual(currentConfig, config)
 }

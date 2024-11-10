@@ -20,8 +20,8 @@ type Module interface {
 	Start() error
 	Stop() error
 	Restart() error
-	GetSettings(params map[string]string) (map[string]interface{}, error)
-	SaveSettings(params map[string]string, settings map[string]interface{}) error
+	GetConfig(params map[string]string) (map[string]interface{}, error)
+	SaveConfig(params map[string]string, config map[string]interface{}) error
 }
 
 var modules = make(map[string]Module)
@@ -103,20 +103,20 @@ func RestartModule(name string) error {
 	return fmt.Errorf("module %s not found", name)
 }
 
-func GetModuleSettings(name string, params map[string]string) (map[string]interface{}, error) {
+func GetModuleConfig(name string, params map[string]string) (map[string]interface{}, error) {
 	modulesMutex.RLock()
 	defer modulesMutex.RUnlock()
 	if module, exists := modules[name]; exists {
-		return module.GetSettings(params)
+		return module.GetConfig(params)
 	}
 	return nil, fmt.Errorf("module %s not found", name)
 }
 
-func SaveModuleSettings(name string, params map[string]string, settings map[string]interface{}) error {
+func SaveModuleConfig(name string, params map[string]string, config map[string]interface{}) error {
 	modulesMutex.RLock()
 	defer modulesMutex.RUnlock()
 	if module, exists := modules[name]; exists {
-		module.SaveSettings(params, settings)
+		module.SaveConfig(params, config)
 		return nil
 	}
 

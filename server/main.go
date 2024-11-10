@@ -2,16 +2,16 @@ package main
 
 import (
 	"log"
-	"openvpn-proxy/actions"
-	"openvpn-proxy/core"
-	"openvpn-proxy/modules/http_proxy"
-	"openvpn-proxy/modules/openvpn"
-	"openvpn-proxy/modules/socks_proxy"
-	"openvpn-proxy/utils"
-	"openvpn-proxy/webserver"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"vpn-sandbox/actions"
+	"vpn-sandbox/core"
+	"vpn-sandbox/modules/http_proxy"
+	"vpn-sandbox/modules/openvpn"
+	"vpn-sandbox/modules/socks_proxy"
+	"vpn-sandbox/utils"
+	"vpn-sandbox/webserver"
 )
 
 func oneTimeSetup(dataDir string) {
@@ -51,6 +51,7 @@ func main() {
 	scriptType := os.Getenv("script_type")
 	appMode := core.WebServer
 	if scriptType != "" && len(args) > 0 && args[0][:3] == "tun" {
+		utils.InitLog(filepath.Join(core.VarDir, "vpn-"+scriptType+".log"))
 		appMode = core.OpenVPNAction
 	}
 
@@ -62,6 +63,9 @@ func main() {
 	if appMode == core.OpenVPNAction {
 		switch scriptType {
 		case "up":
+			utils.Log("logfile: " + filepath.Join(core.VarDir, "vpn-"+scriptType+".log"))
+			utils.Log("core.VarDir: " + core.VarDir)
+			utils.Log("Running script: " + scriptType)
 			actions.SaveOpenVPNSpec()
 			utils.SignalRunning(core.PidFile, core.VPN_UP)
 		case "down":

@@ -1,4 +1,4 @@
-module openvpn-proxy
+module vpn-sandbox
 
 go 1.23.1
 

@@ -2,11 +2,11 @@ package socks_proxy
 
 import (
 	"log"
-	"openvpn-proxy/utils"
 	"os"
 	"os/exec"
 	"strconv"
 	"syscall"
+	"vpn-sandbox/utils"
 )
 
 var proxyCmd *exec.Cmd = nil

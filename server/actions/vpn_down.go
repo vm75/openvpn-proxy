@@ -1,11 +1,10 @@
 package actions
 
 import (
-	"openvpn-proxy/core"
-	"openvpn-proxy/utils"
 	"os"
-	"path/filepath"
 	"strings"
+	"vpn-sandbox/core"
+	"vpn-sandbox/utils"
 )
 
 func getHostGateway() string {
@@ -26,7 +25,6 @@ func getHostGateway() string {
 }
 
 func VpnDown() {
-	utils.InitLog(filepath.Join(core.VarDir, "vpn-down.log"))
 	utils.Log("vpn down")
 
 	// restore resolv.conf

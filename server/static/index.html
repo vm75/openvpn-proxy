@@ -64,8 +64,8 @@
             <!-- Tabs -->
             <div class="tabs is-boxed">
               <ul>
-                <li :class="{ 'is-active': currentTab === 'settings' }">
-                  <a @click="currentTab = 'settings'">Proxy Settings</a>
+                <li :class="{ 'is-active': currentTab === 'config' }">
+                  <a @click="currentTab = 'config'">Proxy Config</a>
                 </li>
                 <li :class="{ 'is-active': currentTab === 'servers' }">
                   <a @click="currentTab = 'servers'">OpenVPN Servers</a>
@@ -73,8 +73,8 @@
               </ul>
             </div>
 
-            <!-- OpenVPN Proxy Settings -->
-            <div v-if="currentTab === 'settings'">
+            <!-- OpenVPN Proxy Config -->
+            <div v-if="currentTab === 'config'">
               <div class="columns">
                 <div class="container column">
                   <div class="container box" style="height: 100%;">
@@ -87,7 +87,7 @@
                           <div class="field control">
                             <basic
                               type="switch"
-                              v-model:value="openvpn.settings.enabled"
+                              v-model:value="openvpn.config.enabled"
                               @update:value="toggleModule('vpn')">
                             </basic>
                           </div>
@@ -101,7 +101,7 @@
                           <div class="field control">
                             <basic
                               type="switch"
-                              v-model:value="http_proxy.settings.enabled"
+                              v-model:value="http_proxy.config.enabled"
                               @update:value="toggleModule('http_proxy')">
                             </basic>
                           </div>
@@ -115,14 +115,14 @@
                           <div class="field control">
                             <basic
                               type="switch"
-                              v-model:value="socks_proxy.settings.enabled"
+                              v-model:value="socks_proxy.config.enabled"
                               @update:value="toggleModule('socks_proxy')">
                             </basic>
                           </div>
                         </div>
                       </div>
                       <div>
-                        <div class="divider">Common Settings</div>
+                        <div class="divider">Common Config</div>
                       </div>
                       <div class="field is-horizontal">
                         <div class="field-label is-normal">
@@ -132,7 +132,7 @@
                           <div class="field control is-fullwidth">
                             <inline-list
                               :name="'Subnet'"
-                              v-model:entries="global.settings.subnets"
+                              v-model:entries="global.config.subnets"
                               type="subnet"
                               @update:entries="setModified('global')">
                             </inline-list>
@@ -146,8 +146,8 @@
                         <div class="field-body">
                           <div class="field">
                             <div class="control select is-fullwidth">
-                              <select v-model="global.settings.vpnType" @change="setModified('global')">
-                                <option v-for="vpnType in global.settings.vpnTypes"
+                              <select v-model="global.config.vpnType" @change="setModified('global')">
+                                <option v-for="vpnType in global.config.vpnTypes"
                                   :key="vpnType"
                                   :value="vpnType"
                                   :selected="vpnType === 'openvpn'">
@@ -158,9 +158,9 @@
                           </div>
                         </div>
                       </div>
-                      <div v-if="global.settings.vpnType === 'openvpn'">
+                      <div v-if="global.config.vpnType === 'openvpn'">
                         <div>
-                          <div class="divider">VPN Settings</div>
+                          <div class="divider">VPN Config</div>
                         </div>
                         <div class="field is-horizontal">
                           <div class="field-label is-normal">
@@ -169,11 +169,11 @@
                           <div class="field-body">
                             <div class="field">
                               <div class="control select is-fullwidth">
-                                <select v-model="openvpn.settings.serverName" @change="setModified('openvpn')">
+                                <select v-model="openvpn.config.serverName" @change="setModified('openvpn')">
                                   <option v-for="server in openvpn.servers"
                                     :key="server.name"
                                     :value="server.name"
-                                    :selected="server.name === openvpn.settings.serverName">
+                                    :selected="server.name === openvpn.config.serverName">
                                       {{ server.name }}
                                   </option>
                                 </select>
@@ -187,11 +187,11 @@
                           </div>
                           <div class="field-body">
                             <div class="field control select is-fullwidth">
-                              <select v-model="openvpn.settings.serverEndpoint" @change="setModified('openvpn')">
+                              <select v-model="openvpn.config.serverEndpoint" @change="setModified('openvpn')">
                                 <option v-for="endpoint in endpoints"
                                   :key="endpoint.name"
                                   :value="endpoint.name"
-                                  :selected="endpoint.name === openvpn.settings.serverEndpoint">
+                                  :selected="endpoint.name === openvpn.config.serverEndpoint">
                                   {{ endpoint.name }}
                                 </option>
                               </select>
@@ -298,12 +298,12 @@
         </section>`,
       data() {
         return {
-          currentTab: 'settings',
+          currentTab: 'config',
           ipInfo: null,
           openvpn: {
             status: false,
             modified: false,
-            settings: {
+            config: {
               enabled: false,
               serverName: '',
               serverEndpoint: '',
@@ -314,19 +314,19 @@
           },
           http_proxy: {
             status: false,
-            settings: {
+            config: {
               enabled: false,
             }
           },
           socks_proxy: {
             status: false,
-            settings: {
+            config: {
               enabled: false,
             }
           },
           global: {
             modified: false,
-            settings: {
+            config: {
               vpnType: 'openvpn',
               vpnTypes: ['openvpn', 'wireguard'],
               subnets: [],
@@ -344,27 +344,27 @@
       },
       methods: {
         async reload() {
-          var globalSettings = await fetch('/api/settings').then(response => response.json());
-          Object.assign(this.global.settings, {
+          var globalSettings = await fetch('/api/config').then(response => response.json());
+          Object.assign(this.global.config, {
             vpnType: globalSettings.vpnType || 'openvpn',
             subnets: globalSettings.subnets || [],
           })
           this.global.modified = false;
 
-          var openVPNSettings = await fetch('/api/openvpn/settings').then(response => response.json());
-          Object.assign(this.openvpn.settings, {
+          var openVPNSettings = await fetch('/api/openvpn/config').then(response => response.json());
+          Object.assign(this.openvpn.config, {
             enabled: openVPNSettings.enabled || false,
             serverName: openVPNSettings.serverName || '',
             serverEndpoint: openVPNSettings.serverEndpoint || '',
             logLevel: openVPNSettings.logLevel || 3,
             retryInterval: openVPNSettings.retryInterval || 3600,
           })
-          var httpProxySettings = await fetch('/api/http_proxy/settings').then(response => response.json());
-          Object.assign(this.http_proxy.settings, {
+          var httpProxySettings = await fetch('/api/http_proxy/config').then(response => response.json());
+          Object.assign(this.http_proxy.config, {
             enabled: httpProxySettings.enabled || false,
           })
-          var socksProxySettings = await fetch('/api/socks_proxy/settings').then(response => response.json());
-          Object.assign(this.socks_proxy.settings, {
+          var socksProxySettings = await fetch('/api/socks_proxy/config').then(response => response.json());
+          Object.assign(this.socks_proxy.config, {
             enabled: socksProxySettings.enabled || false,
           })
           this.openvpn.servers = await fetch('/api/openvpn/servers').then(response => response.json());
@@ -412,8 +412,8 @@
           if (module === 'vpn') {
             module = 'openvpn';
           }
-          var cmd = this[module].settings.enabled ? 'enable' : 'disable';
-          var now = this[module].settings.enabled ? 'start' : 'stop';
+          var cmd = this[module].config.enabled ? 'enable' : 'disable';
+          var now = this[module].config.enabled ? 'start' : 'stop';
           fetch(`/api/${module}/${cmd}?${now}=true`, {
             method: 'POST',
           });
@@ -423,21 +423,21 @@
         },
         saveSettings: function (module) {
           if (this.openvpn.modified) {
-            fetch(`/api/openvpn/settings/save`, {
+            fetch(`/api/openvpn/config/save`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify(this.openvpn.settings)
+              body: JSON.stringify(this.openvpn.config)
             });
           }
           if (this.global.modified) {
-            fetch(`/api/settings/save`, {
+            fetch(`/api/config/save`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify(this.global.settings)
+              body: JSON.stringify(this.global.config)
             });
           }
         },
@@ -455,7 +455,7 @@
       computed: {
         endpoints: function () {
           for (const server of this.openvpn.servers) {
-            if (server.name === this.openvpn.settings.serverName) {
+            if (server.name === this.openvpn.config.serverName) {
               return server.endpoints;
             }
           }

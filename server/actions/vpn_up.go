@@ -3,11 +3,11 @@ package actions
 import (
 	"encoding/json"
 	"fmt"
-	"openvpn-proxy/core"
-	"openvpn-proxy/utils"
 	"os"
 	"path/filepath"
 	"strings"
+	"vpn-sandbox/core"
+	"vpn-sandbox/utils"
 )
 
 type NetSpec struct {
@@ -61,12 +61,11 @@ func RetrieveOpenVPNSpec() (*NetSpec, error) {
 }
 
 func VpnUp(netSpec *NetSpec) {
-	utils.InitLog(filepath.Join(core.VarDir, "vpn-up.log"))
-
 	utils.Log("vpn up")
 
 	if netSpec == nil {
-		netSpec, err := RetrieveOpenVPNSpec()
+		var err error
+		netSpec, err = RetrieveOpenVPNSpec()
 		if netSpec == nil {
 			utils.LogError("No openvpn spec found", err)
 			return

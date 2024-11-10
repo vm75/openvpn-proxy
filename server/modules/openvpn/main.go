@@ -1,10 +1,10 @@
 package openvpn
 
 import (
-	"openvpn-proxy/core"
-	"openvpn-proxy/utils"
 	"os"
 	"path/filepath"
+	"vpn-sandbox/core"
+	"vpn-sandbox/utils"
 
 	"github.com/gorilla/mux"
 )
@@ -17,7 +17,7 @@ type OpenVPNModule struct {
 	RetryInterval  int    `json:"retryInterval"`
 }
 
-var openvpnSettings = OpenVPNModule{
+var openvpnConfig = OpenVPNModule{
 	Enabled:        false,
 	ServerName:     "",
 	ServerEndpoint: "",
@@ -39,24 +39,24 @@ func InitModule() {
 	logFile = filepath.Join(core.VarDir, "openvpn.log")
 	statusFile = filepath.Join(core.VarDir, "openvpn.status")
 
-	savedSettings, err := core.GetSettings("openvpn")
+	savedConfig, err := core.GetConfig("openvpn")
 	if err == nil {
-		utils.MapToObject(savedSettings, &openvpnSettings)
+		utils.MapToObject(savedConfig, &openvpnConfig)
 	} else {
-		utils.ObjectToMap(openvpnSettings, &savedSettings)
-		core.SaveSettings("openvpn", savedSettings)
+		utils.ObjectToMap(openvpnConfig, &savedConfig)
+		core.SaveConfig("openvpn", savedConfig)
 	}
 
-	core.RegisterModule("openvpn", &openvpnSettings)
+	core.RegisterModule("openvpn", &openvpnConfig)
 
 	utils.AddSignalHandler([]os.Signal{core.SHUTDOWN}, func(_ os.Signal) {
-		openvpnSettings.Enabled = false
+		openvpnConfig.Enabled = false
 		killOpenVPN()
 		openvpnCmd.Wait()
 		os.Exit(0)
 	})
 
-	if openvpnSettings.Enabled {
+	if openvpnConfig.Enabled {
 		go runOpenVPN()
 	}
 }
@@ -81,9 +81,9 @@ func (o *OpenVPNModule) GetStatus() (core.ModuleStatus, error) {
 // Enable implements core.Module.
 func (o *OpenVPNModule) Enable(startNow bool) error {
 	o.Enabled = true
-	settings := map[string]interface{}{}
-	utils.ObjectToMap(o, &settings)
-	core.SaveSettings("openvpn", settings)
+	config := map[string]interface{}{}
+	utils.ObjectToMap(o, &config)
+	core.SaveConfig("openvpn", config)
 	if startNow {
 		go runOpenVPN()
 	}
@@ -93,9 +93,9 @@ func (o *OpenVPNModule) Enable(startNow bool) error {
 // Disable implements core.Module.
 func (o *OpenVPNModule) Disable(stopNow bool) error {
 	o.Enabled = false
-	settings := map[string]interface{}{}
-	utils.ObjectToMap(o, &settings)
-	core.SaveSettings("openvpn", settings)
+	config := map[string]interface{}{}
+	utils.ObjectToMap(o, &config)
+	core.SaveConfig("openvpn", config)
 	if stopNow {
 		killOpenVPN()
 	}
@@ -128,20 +128,20 @@ func (o *OpenVPNModule) Restart() error {
 	return nil
 }
 
-// GetSettings implements core.Module.
-func (o *OpenVPNModule) GetSettings(params map[string]string) (map[string]interface{}, error) {
-	var settings map[string]interface{}
-	utils.ObjectToMap(openvpnSettings, &settings)
-	return settings, nil
+// GetConfig implements core.Module.
+func (o *OpenVPNModule) GetConfig(params map[string]string) (map[string]interface{}, error) {
+	var config map[string]interface{}
+	utils.ObjectToMap(openvpnConfig, &config)
+	return config, nil
 }
 
-// SaveSettings implements core.Module.
-func (o *OpenVPNModule) SaveSettings(params map[string]string, settings map[string]interface{}) error {
-	if !utils.HasChanged(o, settings) {
+// SaveConfig implements core.Module.
+func (o *OpenVPNModule) SaveConfig(params map[string]string, config map[string]interface{}) error {
+	if !utils.HasChanged(o, config) {
 		return nil
 	}
-	utils.MapToObject(settings, o)
-	err := core.SaveSettings("openvpn", settings)
+	utils.MapToObject(config, o)
+	err := core.SaveConfig("openvpn", config)
 	if err != nil {
 		return err
 	}

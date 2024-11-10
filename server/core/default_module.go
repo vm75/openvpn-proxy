@@ -7,7 +7,16 @@ import (
 type DefaultModule struct {
 	Name string
 
-	Settings map[string]interface{}
+	Config map[string]interface{}
+}
+
+func (d *DefaultModule) LoadConfig() {
+	var err error
+	d.Config, err = GetConfig(d.Name)
+	if err != nil || d.Config == nil {
+		d.Config = map[string]interface{}{"enabled": false}
+		SaveConfig(d.Name, d.Config)
+	}
 }
 
 func (d *DefaultModule) RegisterRoutes(r *mux.Router) {}
@@ -17,13 +26,13 @@ func (d *DefaultModule) GetStatus() (ModuleStatus, error) {
 }
 
 func (d *DefaultModule) Enable(startNow bool) error {
-	d.Settings["enabled"] = true
-	return SaveSettings(d.Name, d.Settings)
+	d.Config["enabled"] = true
+	return SaveConfig(d.Name, d.Config)
 }
 
 func (d *DefaultModule) Disable(stopNow bool) error {
-	d.Settings["enabled"] = false
-	return SaveSettings(d.Name, d.Settings)
+	d.Config["enabled"] = false
+	return SaveConfig(d.Name, d.Config)
 }
 
 func (d *DefaultModule) Start() error {
@@ -38,11 +47,11 @@ func (d *DefaultModule) Restart() error {
 	return nil
 }
 
-func (d *DefaultModule) GetSettings(params map[string]string) (map[string]interface{}, error) {
-	return d.Settings, nil
+func (d *DefaultModule) GetConfig(params map[string]string) (map[string]interface{}, error) {
+	return d.Config, nil
 }
 
-func (d *DefaultModule) SaveSettings(params map[string]string, settings map[string]interface{}) error {
-	d.Settings["enabled"] = settings["enabled"] == true
-	return SaveSettings(d.Name, d.Settings)
+func (d *DefaultModule) SaveConfig(params map[string]string, config map[string]interface{}) error {
+	d.Config["enabled"] = config["enabled"] == true
+	return SaveConfig(d.Name, d.Config)
 }

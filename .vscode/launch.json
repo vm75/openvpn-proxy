@@ -13,16 +13,7 @@
             "args": [
                 "--port",
                 "8082",
-                "--data",
-                "${workspaceFolder}/test",
             ],
-            "env": {
-                "route_vpn_gateway": "10.100.0.1",
-                "foreign_option_1": "dhcp-option DNS 103.86.96.100",
-                "foreign_option_2": "dhcp-option DNS 103.86.99.100",
-                "dev": "tun0",
-                "script_type": "up"
-            }
         }
     ]
 }

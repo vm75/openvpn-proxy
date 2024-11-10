@@ -1,13 +1,13 @@
 package socks_proxy
 
 import (
-	"openvpn-proxy/core"
-	"openvpn-proxy/utils"
 	"os"
 	"strings"
+	"vpn-sandbox/core"
+	"vpn-sandbox/utils"
 )
 
-func updateConfig() error {
+func updateRuntimeConfig() error {
 	content, err := os.ReadFile("/usr/local/etc/sockd.conf")
 
 	if err != nil {

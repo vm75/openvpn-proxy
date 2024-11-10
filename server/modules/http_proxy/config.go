@@ -2,13 +2,13 @@ package http_proxy
 
 import (
 	"errors"
-	"openvpn-proxy/core"
-	"openvpn-proxy/utils"
 	"os"
 	"regexp"
+	"vpn-sandbox/core"
+	"vpn-sandbox/utils"
 )
 
-func updateConfig() error {
+func updateRuntimeConfig() error {
 	content, err := os.ReadFile("/usr/local/etc/tinyproxy.conf")
 
 	if err != nil {

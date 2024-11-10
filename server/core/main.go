@@ -2,10 +2,10 @@ package core
 
 import (
 	"fmt"
-	"openvpn-proxy/utils"
 	"os"
 	"path/filepath"
 	"syscall"
+	"vpn-sandbox/utils"
 )
 
 var DataDir string
@@ -51,7 +51,7 @@ func Init(dataDir string, appMode AppMode) error {
 	ConfigDir = filepath.Join(dataDir, "config")
 	AppScript = filepath.Join(dataDir, "apps.sh")
 	VarDir = filepath.Join(dataDir, "var")
-	PidFile = filepath.Join(VarDir, "openvpn-proxy.pid")
+	PidFile = filepath.Join(VarDir, "vpn-sandbox.pid")
 
 	err := os.MkdirAll(ConfigDir, 0755)
 	if err != nil {
@@ -65,6 +65,8 @@ func Init(dataDir string, appMode AppMode) error {
 	if appMode == OpenVPNAction {
 		return nil
 	}
+
+	utils.InitLog(filepath.Join(VarDir, "vpn-sandbox.log"))
 
 	// if pid file exists, and process is still running, return
 	if utils.SignalRunning(PidFile, syscall.SIGCONT) {
@@ -81,35 +83,35 @@ func Init(dataDir string, appMode AppMode) error {
 		return err
 	}
 
-	var savedSettings map[string]interface{}
-	savedSettings, err = GetSettings("global")
+	var savedConfig map[string]interface{}
+	savedConfig, err = GetConfig("global")
 	if err == nil {
-		utils.MapToObject(savedSettings, &GlobalConfig)
+		utils.MapToObject(savedConfig, &GlobalConfig)
 	} else {
-		utils.ObjectToMap(GlobalConfig, &savedSettings)
-		SaveSettings("global", savedSettings)
+		utils.ObjectToMap(GlobalConfig, &savedConfig)
+		SaveConfig("global", savedConfig)
 	}
 
 	return nil
 }
 
-func GetGlobalSettings() (map[string]interface{}, error) {
-	var settings map[string]interface{}
-	utils.ObjectToMap(GlobalConfig, &settings)
-	return settings, nil
+func GetGlobalConfig() (map[string]interface{}, error) {
+	var config map[string]interface{}
+	utils.ObjectToMap(GlobalConfig, &config)
+	return config, nil
 }
 
-func SaveGlobalSettings(settings map[string]interface{}) error {
-	if !utils.HasChanged(&GlobalConfig, settings) {
+func SaveGlobalConfig(config map[string]interface{}) error {
+	if !utils.HasChanged(&GlobalConfig, config) {
 		return nil
 	}
-	utils.MapToObject(settings, &GlobalConfig)
-	err := SaveSettings("global", settings)
+	utils.MapToObject(config, &GlobalConfig)
+	err := SaveConfig("global", config)
 	if err != nil {
 		return err
 	}
 
-	utils.PublishEvent(utils.Event{Name: "global-settings-changed", Context: settings})
+	utils.PublishEvent(utils.Event{Name: "global-config-changed", Context: config})
 
 	return nil
 }
