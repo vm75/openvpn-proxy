@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,21 +13,23 @@ import (
 	"vpn-sandbox/webserver"
 )
 
-func oneTimeSetup(dataDir string) {
+func oneTimeSetup() {
 	markerFile := "/.initialized"
+
+	utils.BackupResolvConf()
 
 	if _, err := os.Stat(markerFile); os.IsNotExist(err) {
 		if _, err := os.Stat(core.AppScript); err == nil {
-			log.Printf("Running one-time setup for apps script %s", core.AppScript)
+			utils.LogF("Running one-time setup for apps script %s", core.AppScript)
 			cmd := exec.Command(core.AppScript, "setup")
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			err := cmd.Run()
 			if err != nil {
-				log.Println(err)
+				utils.LogLn(err)
 			}
 		} else {
-			log.Println("No apps script found")
+			utils.LogLn("No apps script found")
 		}
 		os.Create(markerFile)
 	}
@@ -37,15 +38,16 @@ func oneTimeSetup(dataDir string) {
 func main() {
 	ex, err := os.Executable()
 	if err != nil {
-		log.Fatal(err)
+		utils.LogFatal(err)
 	}
 	err = os.Chdir(filepath.Dir(ex))
 	if err != nil {
-		log.Fatal(err)
+		utils.LogFatal(err)
 	}
 
-	params, args := utils.SmartArgs("--data|-d=/data:,--port|-p=80:", os.Args[1:])
+	params, args := utils.SmartArgs("--data|-d=/data:,--port|-p=80:,--sudo", os.Args[1:])
 	dataDir := params["--data"].GetValue()
+	sudoMode := params["--sudo"].IsSet()
 
 	// detect if this is an openvpn action
 	scriptType := os.Getenv("script_type")
@@ -57,15 +59,15 @@ func main() {
 
 	err = core.Init(dataDir, appMode)
 	if err != nil {
-		log.Fatal(err)
+		utils.LogFatal(err)
 	}
 
 	if appMode == core.OpenVPNAction {
 		switch scriptType {
 		case "up":
-			utils.Log("logfile: " + filepath.Join(core.VarDir, "vpn-"+scriptType+".log"))
-			utils.Log("core.VarDir: " + core.VarDir)
-			utils.Log("Running script: " + scriptType)
+			utils.LogLn("logfile: " + filepath.Join(core.VarDir, "vpn-"+scriptType+".log"))
+			utils.LogLn("core.VarDir: " + core.VarDir)
+			utils.LogLn("Running script: " + scriptType)
 			actions.SaveOpenVPNSpec()
 			utils.SignalRunning(core.PidFile, core.VPN_UP)
 		case "down":
@@ -83,13 +85,13 @@ func main() {
 		}
 	})
 
-	oneTimeSetup(dataDir)
+	oneTimeSetup()
 
 	// Disable all connectivity
 	actions.VpnDown()
 
 	// Register modules
-	openvpn.InitModule()
+	openvpn.InitModule(sudoMode)
 	http_proxy.InitModule()
 	socks_proxy.InitModule()
 

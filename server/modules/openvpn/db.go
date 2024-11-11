@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"vpn-sandbox/core"
 	"vpn-sandbox/utils"
@@ -39,7 +38,7 @@ var deleteServerQuery = `DELETE FROM openvpnServers WHERE name = ?;`
 func initDb() {
 	_, err := core.Db.Exec(createServersQuery)
 	if err != nil {
-		log.Fatal(err)
+		utils.LogFatal(err)
 	}
 }
 
@@ -79,9 +78,10 @@ func saveOvpnConfig() error {
 		return authErr
 	}
 
-	if configUpdated || authUpdated {
-		log.Println("Configuration updated, restarting OpenVPN")
+	if utils.IsRunning(openvpnCmd) && (configUpdated || authUpdated) {
+		utils.LogLn("Configuration updated, restarting OpenVPN")
 		killOpenVPN()
+		openvpnCmd.Wait()
 		go runOpenVPN()
 	}
 
@@ -92,7 +92,7 @@ func getOpenVPNServers() []Server {
 	var templates []Server = make([]Server, 0)
 	rows, err := core.Db.Query(getServersQuery)
 	if err != nil {
-		log.Fatal(err)
+		utils.LogFatal(err)
 	}
 	defer rows.Close()
 	var endpointsStr []byte
@@ -105,7 +105,7 @@ func getOpenVPNServers() []Server {
 			&config.Password,
 			&endpointsStr)
 		if err != nil {
-			log.Fatal(err)
+			utils.LogFatal(err)
 			return templates
 		}
 		json.Unmarshal(endpointsStr, &config.Endpoints)
@@ -125,7 +125,7 @@ func getOpenVPNServer(name string) *Server {
 		&config.Password,
 		&endpointsStr)
 	if err != nil {
-		log.Fatal(err)
+		utils.LogFatal(err)
 		return nil
 	}
 	json.Unmarshal(endpointsStr, &config.Endpoints)
@@ -144,7 +144,7 @@ func saveOpenVPNServer(serverConfig Server) error {
 
 	endpointsStr, err := json.Marshal(serverConfig.Endpoints)
 	if err != nil {
-		log.Fatal(err)
+		utils.LogFatal(err)
 		return err
 	}
 	_, err = core.Db.Exec(insertServerQuery,
@@ -154,7 +154,7 @@ func saveOpenVPNServer(serverConfig Server) error {
 		serverConfig.Password,
 		endpointsStr)
 	if err != nil {
-		log.Fatal(err)
+		utils.LogFatal(err)
 	}
 	return err
 }
@@ -162,7 +162,7 @@ func saveOpenVPNServer(serverConfig Server) error {
 func DeleteServer(name string) error {
 	_, err := core.Db.Exec(deleteServerQuery, name)
 	if err != nil {
-		log.Fatal(err)
+		utils.LogFatal(err)
 	}
 	return err
 }

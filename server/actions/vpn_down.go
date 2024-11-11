@@ -8,7 +8,7 @@ import (
 )
 
 func getHostGateway() string {
-	if _, err := os.Stat("/etc/resolv.conf"); !os.IsNotExist(err) {
+	if _, err := os.Stat("/etc/resolv.conf.ovpnsave"); !os.IsNotExist(err) {
 		fileContent, err := os.ReadFile("/etc/resolv.conf.ovpnsave")
 		if err == nil {
 			// extract first nameserver as host gateway
@@ -25,21 +25,14 @@ func getHostGateway() string {
 }
 
 func VpnDown() {
-	utils.Log("vpn down")
+	utils.LogLn("vpn down")
 
 	// restore resolv.conf
 	utils.RestoreResolvConf()
 
 	// get host gateway from resolv.conf
 	hostGateway := getHostGateway()
-	utils.Log("host gateway: " + hostGateway)
-
-	// remove resolv.conf.ovpnsave
-	if _, err := os.Stat("/etc/resolv.conf.ovpnsave"); !os.IsNotExist(err) {
-		if err := os.Remove("/etc/resolv.conf.ovpnsave"); err != nil {
-			utils.LogError("Error removing /etc/resolv.conf.ovpnsave", err)
-		}
-	}
+	utils.LogLn("host gateway: " + hostGateway)
 
 	// Set routes
 	// Remove all existing default routes

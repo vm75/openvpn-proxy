@@ -1,11 +1,9 @@
 package openvpn
 
 import (
-	"log"
 	"os"
 	"os/exec"
 	"strconv"
-	"syscall"
 	"time"
 	"vpn-sandbox/core"
 	"vpn-sandbox/utils"
@@ -17,32 +15,28 @@ const (
 )
 
 var openvpnCmd *exec.Cmd = nil
-var isRunning = false
-
-func fileExists(filename string) bool {
-	_, err := os.Stat(filename)
-	return !os.IsNotExist(err)
-}
 
 func runOpenVPN() {
-	if isRunning || !openvpnConfig.Enabled {
+	if utils.IsRunning(openvpnCmd) || !openvpnConfig.Enabled {
 		return
 	}
 
+	saveOvpnConfig()
+
 	// check if config files exist
-	if !fileExists(configFile) || !fileExists(authFile) {
-		log.Println("VPN config/auth file(s) not found")
+	if !utils.FileExists(configFile) || !utils.FileExists(authFile) {
+		utils.LogLn("VPN config/auth file(s) not found")
 		return
 	}
 
 	execPath, _ := os.Executable()
 
-	isRunning = true
 	for openvpnConfig.Enabled {
 		retryInterval := strconv.Itoa(openvpnConfig.RetryInterval)
 
-		log.Println("Starting OpenVPN")
-		openvpnCmd = exec.Command("openvpn",
+		utils.LogLn("Starting OpenVPN")
+		var cmd []string = []string{
+			"openvpn",
 			"--client",
 			"--cd", core.VarDir,
 			"--config", configFile,
@@ -64,6 +58,13 @@ func runOpenVPN() {
 			"--remote-cert-tls", "server",
 			"--data-ciphers", dataCiphers,
 			"--writepid", pidFile,
+		}
+		if useSudo {
+			cmd = append([]string{"sudo"}, cmd...)
+		}
+		openvpnCmd = exec.Command(
+			cmd[0],
+			cmd[1:]...,
 		)
 
 		openvpnCmd.Stdout = os.Stdout
@@ -71,13 +72,13 @@ func runOpenVPN() {
 
 		err := openvpnCmd.Start()
 		if err != nil {
-			log.Println(err)
+			utils.LogLn(err)
 			sleepFor := max(openvpnConfig.RetryInterval, 60)
 			time.Sleep(time.Duration(sleepFor) * time.Second)
 		} else {
-			log.Println("OpenVPN started with pid", openvpnCmd.Process.Pid)
+			utils.LogLn("OpenVPN started with pid", openvpnCmd.Process.Pid)
 			status := openvpnCmd.Wait()
-			log.Printf("OpenVPN exited with status: %v\n", status)
+			utils.LogF("OpenVPN exited with status: %v\n", status)
 			sleepFor := max(openvpnConfig.RetryInterval, 60)
 			time.Sleep(time.Duration(sleepFor) * time.Second)
 		}
@@ -86,11 +87,16 @@ func runOpenVPN() {
 			break
 		}
 	}
-
-	isRunning = false
 }
 
 func killOpenVPN() {
-	utils.SignalCmd(openvpnCmd, syscall.SIGTERM)
+	var cmd []string = []string{
+		"/usr/bin/pkill", "-15", "-x", "openvpn",
+	}
+	if useSudo {
+		cmd = append([]string{"sudo"}, cmd...)
+	}
+
+	go utils.RunCommand(cmd[0], cmd[1:]...)
 	// openvpnCmd.Wait()
 }

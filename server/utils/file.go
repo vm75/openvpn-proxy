@@ -4,10 +4,7 @@ import "os"
 
 func UpdateContent(content string, file string) (bool, error) {
 	fileContent, err := os.ReadFile(file)
-	if err != nil {
-		return true, nil
-	}
-	if string(fileContent) == content {
+	if err == nil && string(fileContent) == content {
 		return false, nil
 	}
 	err = os.WriteFile(file, []byte(content), 0644)
@@ -15,4 +12,9 @@ func UpdateContent(content string, file string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func FileExists(filename string) bool {
+	_, err := os.Stat(filename)
+	return !os.IsNotExist(err)
 }

@@ -36,13 +36,11 @@ func InitModule() {
 
 	configFile = filepath.Join(core.VarDir, "sockd.conf")
 	pidFile = filepath.Join(core.VarDir, "sockd.pid")
-
-	updateRuntimeConfig()
 }
 
 // GetStatus implements core.Module.
 func (h *HttpProxyModule) GetStatus() (core.ModuleStatus, error) {
-	return core.ModuleStatus{Running: isRunning()}, nil
+	return core.ModuleStatus{Running: utils.IsRunning(proxyCmd)}, nil
 }
 
 // HandleEvent implements utils.EventListener.

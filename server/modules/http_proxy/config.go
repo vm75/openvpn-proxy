@@ -23,7 +23,7 @@ func updateRuntimeConfig() error {
 	listenAddr := utils.GetIpV4Addr("eth0", true)
 	bindAddr := utils.GetIpV4Addr("tun0", true)
 
-	if listenAddr != "" || bindAddr != "" {
+	if listenAddr == "" || bindAddr == "" {
 		return errors.New("listen or bind not found")
 	}
 

@@ -61,7 +61,7 @@ func RetrieveOpenVPNSpec() (*NetSpec, error) {
 }
 
 func VpnUp(netSpec *NetSpec) {
-	utils.Log("vpn up")
+	utils.LogLn("vpn up")
 
 	if netSpec == nil {
 		var err error
@@ -71,8 +71,6 @@ func VpnUp(netSpec *NetSpec) {
 			return
 		}
 	}
-
-	utils.BackupResolvConf()
 
 	var sb strings.Builder
 	if len(netSpec.Domains) == 1 {

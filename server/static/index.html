@@ -201,7 +201,7 @@
                       </div>
                     </form>
                     <div class="mt-4 buttons">
-                      <button class="button is-success mx-auto" @click="saveSettings" :disabled="!isModified">Save</button>
+                      <button class="button is-success mx-auto" @click="saveConfig" :disabled="!isModified">Save</button>
                     </div>
                   </div>
                 </div>
@@ -344,28 +344,28 @@
       },
       methods: {
         async reload() {
-          var globalSettings = await fetch('/api/config').then(response => response.json());
+          var globalConfig = await fetch('/api/config').then(response => response.json());
           Object.assign(this.global.config, {
-            vpnType: globalSettings.vpnType || 'openvpn',
-            subnets: globalSettings.subnets || [],
+            vpnType: globalConfig.vpnType || 'openvpn',
+            subnets: globalConfig.subnets || [],
           })
           this.global.modified = false;
 
-          var openVPNSettings = await fetch('/api/openvpn/config').then(response => response.json());
+          var openVPNConfig = await fetch('/api/openvpn/config').then(response => response.json());
           Object.assign(this.openvpn.config, {
-            enabled: openVPNSettings.enabled || false,
-            serverName: openVPNSettings.serverName || '',
-            serverEndpoint: openVPNSettings.serverEndpoint || '',
-            logLevel: openVPNSettings.logLevel || 3,
-            retryInterval: openVPNSettings.retryInterval || 3600,
+            enabled: openVPNConfig.enabled || false,
+            serverName: openVPNConfig.serverName || '',
+            serverEndpoint: openVPNConfig.serverEndpoint || '',
+            logLevel: openVPNConfig.logLevel || 3,
+            retryInterval: openVPNConfig.retryInterval || 3600,
           })
-          var httpProxySettings = await fetch('/api/http_proxy/config').then(response => response.json());
+          var httpProxyConfig = await fetch('/api/http_proxy/config').then(response => response.json());
           Object.assign(this.http_proxy.config, {
-            enabled: httpProxySettings.enabled || false,
+            enabled: httpProxyConfig.enabled || false,
           })
-          var socksProxySettings = await fetch('/api/socks_proxy/config').then(response => response.json());
+          var socksProxyConfig = await fetch('/api/socks_proxy/config').then(response => response.json());
           Object.assign(this.socks_proxy.config, {
-            enabled: socksProxySettings.enabled || false,
+            enabled: socksProxyConfig.enabled || false,
           })
           this.openvpn.servers = await fetch('/api/openvpn/servers').then(response => response.json());
           this.openvpn.modified = false;
@@ -421,7 +421,7 @@
         setModified: function (what) {
           this[what].modified = true;
         },
-        saveSettings: function (module) {
+        saveConfig: function (module) {
           if (this.openvpn.modified) {
             fetch(`/api/openvpn/config/save`, {
               method: 'POST',

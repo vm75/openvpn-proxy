@@ -1,24 +1,21 @@
 package socks_proxy
 
 import (
-	"log"
 	"os"
 	"os/exec"
 	"strconv"
-	"syscall"
 	"vpn-sandbox/utils"
 )
 
 var proxyCmd *exec.Cmd = nil
 
-func isRunning() bool {
-	return utils.IsRunning(proxyCmd)
-}
-
 func startProxy() {
 	if utils.IsRunning(proxyCmd) {
 		return
 	}
+
+	updateRuntimeConfig()
+
 	proxyCmd = exec.Command("/usr/local/sbin/sockd", "-f", configFile)
 
 	proxyCmd.Stdout = os.Stdout
@@ -26,17 +23,17 @@ func startProxy() {
 
 	err := proxyCmd.Start()
 	if err != nil {
-		log.Println(err)
+		utils.LogLn(err)
 	} else {
-		log.Println("Socks Proxy started with pid", proxyCmd.Process.Pid)
+		utils.LogLn("Socks Proxy started with pid", proxyCmd.Process.Pid)
 		os.WriteFile(pidFile, []byte(strconv.Itoa(proxyCmd.Process.Pid)), 0644)
 		status := proxyCmd.Wait()
 		os.Remove(pidFile)
-		log.Printf("Socks Proxy exited with status: %v\n", status)
+		utils.LogF("Socks Proxy exited with status: %v\n", status)
 	}
 }
 
 func stopProxy() {
-	utils.SignalCmd(proxyCmd, syscall.SIGTERM)
-	proxyCmd.Wait()
+	go utils.RunCommand("/usr/bin/pkill", "-15", "sockd")
+	// proxyCmd.Wait()
 }

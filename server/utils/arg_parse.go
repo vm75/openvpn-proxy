@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"log"
 	"os"
 	"strings"
 )
@@ -99,7 +98,7 @@ func SmartArgs(optString string, args []string) (map[string]*Option, []string) {
 		if options[option] != nil {
 			if options[option].needsValue() {
 				if i+1 >= len(args) {
-					log.Fatal("Missing argument for option " + option)
+					LogFatal("Missing argument for option " + option)
 				}
 				i++
 				options[option].setValue(args[i])

@@ -29,8 +29,9 @@ var authFile = ""
 var pidFile = ""
 var logFile = ""
 var statusFile = ""
+var useSudo = false
 
-func InitModule() {
+func InitModule(sudoMode bool) {
 	initDb()
 
 	configFile = filepath.Join(core.VarDir, "vpn.ovpn")
@@ -38,6 +39,8 @@ func InitModule() {
 	pidFile = filepath.Join(core.VarDir, "openvpn.pid")
 	logFile = filepath.Join(core.VarDir, "openvpn.log")
 	statusFile = filepath.Join(core.VarDir, "openvpn.status")
+
+	useSudo = sudoMode
 
 	savedConfig, err := core.GetConfig("openvpn")
 	if err == nil {
@@ -52,7 +55,9 @@ func InitModule() {
 	utils.AddSignalHandler([]os.Signal{core.SHUTDOWN}, func(_ os.Signal) {
 		openvpnConfig.Enabled = false
 		killOpenVPN()
-		openvpnCmd.Wait()
+		if utils.IsRunning(openvpnCmd) {
+			openvpnCmd.Wait()
+		}
 		os.Exit(0)
 	})
 

@@ -3,7 +3,6 @@ package webserver
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"vpn-sandbox/core"
@@ -207,6 +206,6 @@ func WebServer(port string) {
 	fmt.Printf("Server starting on port %s\n", port)
 	err := http.ListenAndServe(":"+port, r)
 	if err != nil {
-		log.Fatal(err)
+		utils.LogFatal(err)
 	}
 }

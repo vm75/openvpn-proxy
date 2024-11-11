@@ -2,7 +2,6 @@ package utils
 
 import (
 	"encoding/json"
-	"log"
 	"os"
 	"os/exec"
 	"regexp"
@@ -24,8 +23,9 @@ func GetDefaultGateway() (string, error) {
 
 func BackupResolvConf() {
 	// copy exising resolv.conf to resolv.conf.ovpnsave
-	if _, err := os.Stat("/etc/resolv.conf.ovpnsave"); os.IsNotExist(err) {
-		RunCommand("/bin/cp", "/etc/resolv.conf", "/etc/resolv.conf.ovpnsave")
+	err := RunCommand("/bin/cp", "/etc/resolv.conf", "/etc/resolv.conf.ovpnsave")
+	if !FileExists("/etc/resolv.conf.ovpnsave") {
+		LogError("Error creating /etc/resolv.conf.ovpnsave", err)
 	}
 }
 
@@ -40,11 +40,12 @@ func RestoreResolvConf() {
 }
 
 func GetIpInfo(ipInfo map[string]interface{}) error {
+	LogLn("get ip info")
 	// https://worldtimeapi.org/api/ip
 	cmd := exec.Command("/usr/bin/wget", "-q", "-O", "-", "https://ipinfo.io/json")
 	out, err := cmd.CombinedOutput()
+	LogLn(string(out))
 	if err != nil {
-		log.Println(string(out))
 		return err
 	}
 
