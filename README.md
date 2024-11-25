@@ -1,3 +1,5 @@
+## IMPORTANT NOTE: THIS REPO IS DEPRECATED. PLEASE TRY [https://github.com/vm75/vpn-sandbox](https://github.com/vm75/vpn-sandbox) WHICH IS WRITEN IN GO FROM SCRATCH.
+
 # OpenVPN Client for Docker
 ## What is this and what does it do?
 [`vm75/openvpn-proxy`](https://hub.docker.com/r/vm75/openvpn-proxy)  is a containerized OpenVPN client. It has a kill switch built with `iptables` that kills Internet connectivity to the container if the VPN tunnel goes down for any reason. It also includes an HTTP proxy server ([Tinyproxy](https://tinyproxy.github.io/)) and a SOCKS proxy server ([Dante](https://www.inet.no/dante/index.html)). This allows hosts and non-containerized applications to use the VPN without having to run VPN clients on those hosts.
